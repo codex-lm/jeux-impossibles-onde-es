@@ -1,6 +1,6 @@
 {
   "title": "Onde",
-  "description": "Pieces in quantum superposition. Split a Wave into two 50/50 ghosts — reality only collapses at the moment of interaction. Capture the enemy Core while betting on which ghost is real. Play hotseat, against an honest AI, or online with a friend in a LOB7 room.",
+  "description": "Pieces in quantum superposition. Split a Wave into two 50/50 ghosts — reality only collapses at the moment of interaction. Capture the enemy Core while betting on which ghost is real. Play hotseat, against an honest AI, or online with a friend in a LOB7 room. This edition adds full Spanish to the interface and rules (English · Français · Español).",
   "entrypoint": "index.html",
   "license": "MIT",
   "controls": [
@@ -17,7 +17,8 @@
     "Bluff"
   ],
   "credits": [
-    "A game by Cédric Bernadac, created with AI agents (ZCode & Kimi K3.1 Pro)."
+    "A game by Cédric Bernadac, created with AI agents (ZCode & Kimi K3.1 Pro).",
+    "Spanish edition: Z Code, with an ES translation by Kimi K3.1 Pro."
   ],
   "multiplayer": {
     "mode": "room",

@@ -483,12 +483,12 @@ button.mini{padding:6px 11px;font-size:12px}
    ===================================================================== */
 
 /* ---------------- Internationalisation ---------------- */
-/* Anglais par défaut, bascule FR via le bouton d'en-tête ; mémorisé en
+/* Anglais par défaut, cycle FR/ES via le bouton (ES ajouté par la variante onde-es, Z Code) d'en-tête ; mémorisé en
    sessionStorage (silencieux sous file://). « ONDE » et Azur/Corail inchangés. */
 var LANG="en";
 try{
   var stockLang=sessionStorage.getItem("onde-lang");
-  if(stockLang==="fr"||stockLang==="en")LANG=stockLang;
+  if(stockLang==="fr"||stockLang=="en"||stockLang==="es")LANG=stockLang;
 }catch(e){/* file:// ou stockage indisponible : on garde la valeur par défaut */}
 var STR={
 en:{
@@ -749,6 +749,130 @@ fr:{
   decoPerdue:"Connexion perdue — {msg} Retour à l'accueil.",
   decoParti:"Votre adversaire a quitté le salon. Retour à l'accueil."
 }
+,es:{
+  titre:"ONDE — Piezas en superposición",
+  sousTitre:"Piezas en superposición",
+  langTitre:"Cambiar al inglés",
+  sonTitre:"Activar o desactivar los efectos de sonido",
+  sonOui:"Sonido: activado",sonNon:"Sonido: desactivado",
+  accueil:"Inicio",regles:"Reglas",quitterSalon:"Salir de la sala",nouvelle:"Nueva partida",
+  auTour:"tu turno",sufIA:" (IA)",sufVous:" (tú)",
+  matCore:"1 núcleo",matOnde1:"1 ola sólida",matOndeN:"{n} olas sólidas",
+  matFantome1:"1 fantasma",matFantomeN:"{n} fantasmas",
+  journalTitre:"Registro",
+  btnDeplacer:"Mover",btnScinder:"Escindir",btnConfirmer:"Confirmar escisión",btnReduire:"Colapsar este fantasma",
+  legende:"<b>Núcleo</b>rey, 1 casilla<b>Ola</b>1–2 casillas en línea<b>Fantasma</b>superposición 50/50",
+  indiceSel:"Selecciona una de tus piezas.",
+  indiceSelCamp:"Selecciona una de tus piezas de {camp}.",
+  indiceFantome:"Fantasma en superposición 50/50 en {cells}.<br>Colápsalo para sortear su casilla real.",
+  indiceNoyau:"El núcleo se mueve exactamente una casilla.",
+  depl1:"1 movimiento posible — o cambia al modo Escisión.",
+  deplN:"{n} movimientos posibles — o cambia al modo Escisión.",
+  indiceSci:"Elige dos casillas vacías alcanzables y luego confirma.",
+  cpt1:"{n}/2 casilla elegida",cptN:"{n}/2 casillas elegidas",
+  et:"y",
+  finPartie:"Fin de la partida.",
+  iaPense:"La IA está pensando<span class=\"pulse-txt\">…</span>",
+  coupTransmis:"Movimiento enviado — el anfitrión-árbitro está validando…",
+  auTourDe:"Esperando a {camp}…",
+  fermer:"Cerrar",
+  reglesSous:"Piezas en superposición — reglas completas",
+  reglesHTML:"<h4>Tablero y material</h4>"+
+    "Un hexágono de 37 casillas (radio 3). Cada bando tiene un <b>núcleo</b> (el rey) y tres <b>olas</b>. "+
+    "Azur ocupa la fila inferior y Corail la superior, en espejo. Las casillas se llaman a1 … g7. <b>Azur empieza.</b>"+
+    "<h4>Sólido y fantasma</h4>"+
+    "Una pieza es <b>sólida</b> (una sola casilla) o un <b>fantasma</b>: una ola en superposición 50/50 ocupa entonces "+
+    "<b>dos casillas</b>, ambas mostradas en punteado con un “?”. Nadie — ni siquiera su dueño — sabe en cuál "+
+    "está realmente: la posición solo existe como una probabilidad, y solo un sorteo puede revelarla."+
+    "<h4>Turno de juego — una sola acción</h4>"+
+    "<b>1. Mover</b> una pieza sólida: una ola se desliza en línea recta 1 o 2 casillas (6 direcciones, sin saltar nunca "+
+    "sobre una pieza sólida); el núcleo se mueve exactamente 1 casilla. Está prohibido terminar sobre tus propias piezas, "+
+    "sólidas o fantasmas.<br>"+
+    "<b>2. Escindir</b> una ola sólida: abandona su casilla y se convierte en un fantasma 50/50 sobre <b>dos casillas "+
+    "vacías distintas</b>, cada una alcanzable mediante un movimiento legal de ola (con el camino totalmente despejado). "+
+    "El núcleo nunca se escinde; un fantasma no se mueve ni se escinde.<br>"+
+    "<b>3. Colapsar</b> uno de tus fantasmas: un sorteo justo 50/50 — una de las dos casillas se convierte en la ola "+
+    "sólida y la otra se evapora."+
+    "<h4>Interacción = colapso</h4>"+
+    "En cuanto un fantasma es atacado, atravesado o colapsado, <b>colapsa primero</b>. Después, si el superviviente "+
+    "ocupa la casilla objetivo del atacante, es <b>capturado</b> si el atacante es enemigo (el atacante ocupa su lugar); "+
+    "si el superviviente está en otra casilla, el ataque <b>pasa a través</b> (la casilla está realmente vacía). "+
+    "Un desplazamiento de 2 casillas que encuentra un fantasma en la primera lo colapsa y luego continúa. "+
+    "Una casilla fantasma <b>bloquea</b> hasta que se colapsa: entrar en ella desencadena el colapso — esto también se aplica "+
+    "a tus propios fantasmas (solo un sorteo puede entonces cerrarte el paso)."+
+    "<h4>Captura y victoria</h4>"+
+    "Terminar sobre una pieza enemiga sólida la captura (un fantasma no captura, ya que nunca se mueve, pero puede "+
+    "colapsarse o ser capturado mediante una interacción). <b>Capturar el núcleo enemigo te da la victoria inmediata.</b>"+
+    "<h4>Contra la IA</h4>"+
+    "Juegas con <b>Azur</b> y la IA con <b>Corail</b>. Solo lee el tablero público: los fantasmas — tanto los suyos como "+
+    "los tuyos — siguen siendo probabilidades 50/50 para ella; nunca consulta ninguna posición real oculta. "+
+    "Nivel <b>Normal</b>: evaluación voraz del valor esperado — captura segura de una pieza sólida (el núcleo primero), "+
+    "ataques a fantasmas contados a la mitad de su valor, escisiones para amenazar o huir, colapsos para consolidar, seguridad del núcleo "+
+    "(distancia, alineaciones). Nivel <b>Fácil</b>: aproximadamente un 60 % de movimientos legales aleatorios. Durante su turno, “La IA está "+
+    "pensando…” se muestra unos 800 ms; después, las animaciones habituales muestran su movimiento, sin pantalla intermedia."+
+    "<h4>En línea — sala LOB7</h4>"+
+    "Dos navegadores abiertos en la misma sala LOB7. Cada cliente anuncia su identificador: el menor se convierte en "+
+    "<b>Azur</b>, el anfitrión-árbitro que conserva el estado real y realiza los sorteos del colapso; el otro es <b>Corail</b> "+
+    "y propone sus movimientos, que el anfitrión valida, aplica y devuelve como una <b>vista pública</b> — "+
+    "piezas sólidas, fantasmas como dos casillas “?”, registro — nunca las posiciones reales. Mensajes limitados a 8 KB, idempotencia "+
+    "por clave, un botón “Salir de la sala” y una pantalla específica al desconectarse."+
+    "<div class=\"pourquoi\">Nota honesta: el anfitrión-árbitro conoce cada sorteo en cuanto se produce, y un "+
+    "anfitrión malintencionado podría sesgarlos — este modo depende de la confianza depositada en el anfitrión.</div>"+
+    "<div class=\"pourquoi\">Por qué era imposible antes de las computadoras: las superposiciones 50/50 ocultas y los sorteos justos "+
+    "requieren un árbitro digital.</div>",
+  victoireTitre:"VICTORIA",patTitre:"EMPATE",
+  victoireTexte:"Los {camp} ganan.",
+  rNoyau:"El núcleo de {camp} ha sido capturado.",
+  rNoyauCell:"El núcleo de {camp} ({cell}) ha sido capturado — ¡{adv} gana!",
+  rBloque:"Ninguno de los dos bandos tiene movimientos legales.",
+  rejouer:"Jugar de nuevo",
+  salonInterrompu:"SALA DESCONECTADA",retourAccueil:"Volver al inicio",
+  accueilSous:"Piezas en superposición — laboratorio cuántico",
+  accueilIa:"Jugar contra la IA",
+  accueilIaDesc:"Eres Azur y la computadora juega con Corail (Normal) — nunca lee las posiciones reales de los fantasmas.",
+  accueilFacile:"Contra la IA — nivel Fácil",
+  accueilHotseat:"Dos jugadores — misma pantalla",
+  accueilHotseatDesc:"Azur y Corail se alternan en esta pantalla; el árbitro integrado realiza sorteos del colapso aleatorios y justos.",
+  accueilLigne:"En línea — sala LOB7",
+  accueilLigneDesc:"Dos navegadores en la misma sala; el identificador menor se convierte en Azur, el anfitrión-árbitro.",
+  annuler:"Cancelar",facile:"Fácil",normal:"Normal",
+  motNoyau:"Núcleo",motOnde:"Ola",
+  jMvt:"{camp}: {piece} {a} → {b}.",
+  toastReduire:"Colapso: la pieza estaba realmente en {cell}.",
+  jRedVol:"Colapso voluntario: la ola de {camp} estaba realmente en {cell}.",
+  jRedInt:"Colapso por interacción: la ola de {camp} estaba realmente en {cell}.",
+  toastNoyauTombe:"¡El núcleo ha caído!",toastCapture:"¡Captura!",
+  jPriseOnde:"Captura: la ola de {camp} ({cell}) es capturada por {adv}.",
+  toastFantomeChemin:"Tu fantasma se materializó en el camino: la pieza se detiene.",
+  jInterrompu:"{camp}: movimiento detenido por su propio fantasma ({cell}).",
+  toastScission:"¡Escisión!",
+  jScission:"Escisión: la ola de {camp} se superpone entre {a} y {b}.",
+  toastPasse:"{camp} no tiene movimientos legales: se salta el turno.",
+  jPasse:"{camp}: sin movimientos legales, se salta el turno.",
+  toastImmobile:"Esta pieza no puede actuar.",
+  toastCasesVides:"La escisión requiere casillas vacías.",
+  toastIllegal:"Movimiento ilegal.",
+  sepNouvelle:"— Nueva partida —",toastNouvelle:"Nueva partida — Azur empieza.",
+  jSalonAzur:"— Sala LOB7: eres Azur, anfitrión-árbitro —",
+  toastAzurHote:"Eres Azur — anfitrión-árbitro. Azur empieza: es tu turno.",
+  statutAdvTrouve:"Adversario encontrado — eres Corail; el anfitrión está iniciando la partida…",
+  jSalonCorail:"— Sala LOB7: eres Corail —",
+  toastCorail:"Eres Corail. Azur (anfitrión-árbitro) empieza.",
+  refusDefaut:"El anfitrión-árbitro rechazó el movimiento.",
+  refusTour:"No es el turno de Corail.",
+  refusIllegal:"Movimiento rechazado por el árbitro: ilegal.",
+  toastResync:"Resincronizado con la vista del árbitro.",
+  hoteMuet:"el anfitrión-árbitro ya no responde.",
+  salonFerne:"la sala cerró la conexión.",
+  statutConnexion:"Conectando a la sala LOB7…",
+  statutRecherche:"Te has unido a la sala — buscando un adversario…",
+  echecPersonne:"Ningún adversario respondió en la sala.",
+  horsLob7:"Fuera de LOB7: este modo requiere abrir la página en su vista previa de LOB7 (lob7.com) y elegir una sala.",
+  echecSalon:"No fue posible unirse a la sala: {msg}.",
+  lob7Indispo:"LOB7 no disponible",
+  decoPerdue:"Conexión perdida — {msg} Volver al inicio.",
+  decoParti:"Tu adversario salió de la sala. Volver al inicio."
+}
 };
 function T(k){
   var s=STR[LANG]&&STR[LANG][k];
@@ -787,11 +911,11 @@ function majTextes(){
   for(i=0;i<els.length;i++)els[i].setAttribute("title",T(els[i].getAttribute("data-i18n-title")));
   var r=document.querySelector("#modale-regles .regles");
   if(r)r.innerHTML=T("reglesHTML");
-  document.getElementById("btn-langue").textContent=LANG==="en"?"FR":"EN";
+  document.getElementById("btn-langue").textContent=LANG==="en"?"FR":(LANG==="fr"?"ES":"EN");
   document.getElementById("btn-son").textContent=sonActif?T("sonOui"):T("sonNon");
 }
 function setLang(l){
-  LANG=l==="fr"?"fr":"en";
+  LANG=(l==="fr"||l==="es")?l:"en";
   try{sessionStorage.setItem("onde-lang",LANG);}catch(e){}
   document.documentElement.lang=LANG;
   document.title=T("titre");
@@ -799,7 +923,7 @@ function setLang(l){
   if(state)syncPanneau();
 }
 document.getElementById("btn-langue").addEventListener("click",function(){
-  setLang(LANG==="en"?"fr":"en");
+  setLang(LANG==="en"?"fr":(LANG==="fr"?"es":"en"));
 });
 
 /* ---------------- Utilitaires ---------------- */
