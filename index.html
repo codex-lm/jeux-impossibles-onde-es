@@ -1,0 +1,2399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ONDE — Pieces in superposition</title>
+<style>
+/* ============ ONDE — jeu autonome, aucune dépendance externe ============ */
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:#120b2e;color:#cfc8ff;overflow:hidden;
+  font-family:"Segoe UI",system-ui,-apple-system,sans-serif;
+  -webkit-user-select:none;user-select:none;
+}
+#plateau{position:fixed;inset:0;display:block}
+
+/* ---------- En-tête ---------- */
+#entete{
+  position:fixed;top:0;left:0;right:0;height:66px;z-index:6;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 22px;pointer-events:none;
+  background:linear-gradient(180deg,rgba(18,11,46,.94) 0%,rgba(18,11,46,.55) 60%,rgba(18,11,46,0) 100%);
+}
+#entete>*{pointer-events:auto}
+.titre-bloc h1{
+  font-family:Georgia,"Times New Roman",serif;font-weight:600;
+  font-size:30px;letter-spacing:.38em;color:#ff5fd2;
+  text-shadow:0 0 18px rgba(255,95,210,.4),0 0 46px rgba(255,95,210,.18);
+}
+.titre-bloc p{
+  font-size:11px;letter-spacing:.24em;text-transform:uppercase;
+  color:rgba(207,200,255,.62);margin-top:2px;
+}
+.boutons{display:flex;gap:10px}
+button{
+  font-family:inherit;font-size:13px;letter-spacing:.06em;color:#cfc8ff;
+  background:rgba(88,247,255,.05);border:1px solid rgba(88,247,255,.3);
+  border-radius:9px;padding:9px 16px;cursor:pointer;
+  transition:background .15s,border-color .15s,box-shadow .15s,transform .06s;
+}
+button:hover{background:rgba(88,247,255,.11);border-color:rgba(88,247,255,.65);box-shadow:0 0 14px rgba(88,247,255,.16)}
+button:active{transform:translateY(1px)}
+button:disabled{opacity:.35;cursor:default;box-shadow:none}
+button.primary{background:rgba(255,95,210,.15);border-color:rgba(255,95,210,.9);font-weight:600}
+button.primary:hover{background:rgba(255,95,210,.24);border-color:#ff5fd2;box-shadow:0 0 16px rgba(255,95,210,.32)}
+button.mini{padding:6px 11px;font-size:12px}
+
+/* ---------- Panneau latéral ---------- */
+#panneau{
+  position:fixed;top:80px;right:14px;bottom:14px;width:302px;z-index:5;
+  display:flex;flex-direction:column;gap:10px;
+}
+.carte{
+  background:rgba(26,18,64,.86);border:1px solid rgba(74,63,158,.6);
+  border-radius:13px;padding:12px 14px;backdrop-filter:blur(5px);
+}
+.carte h3{
+  font-size:11px;letter-spacing:.22em;text-transform:uppercase;
+  color:rgba(207,200,255,.58);margin-bottom:8px;font-weight:600;
+}
+#carte-tour{display:flex;align-items:center;gap:12px;border-left:3px solid var(--c,#6ec8ff)}
+#pastille-tour{
+  width:15px;height:15px;border-radius:50%;flex:none;
+  background:var(--c,#6ec8ff);box-shadow:0 0 14px var(--c,#6ec8ff);
+}
+#nom-tour{font-size:19px;font-weight:600;color:var(--c,#6ec8ff)}
+#detail-tour{font-size:11px;color:#a79edd;margin-top:2px}
+#indice{font-size:13px;color:#cfc8ff;line-height:1.45}
+.modes{display:flex;gap:8px;margin-top:10px}
+.modes button{flex:1;padding:7px 4px;font-size:12.5px}
+.modes button.actif{background:rgba(255,95,210,.18);border-color:#ff5fd2;font-weight:600}
+#compteur-split{font-size:12px;color:#a79edd;margin-top:8px}
+#btn-confirmer-split{width:100%;margin-top:8px}
+#btn-reduire{width:100%;margin-top:6px}
+.legende{display:flex;align-items:center;gap:9px}
+.legende canvas{flex:none}
+.legende .legende-txt{font-size:11.5px;color:#bfb6f2;line-height:1.3}
+.legende b{color:#cfc8ff;display:block;font-size:12px;margin-top:5px}
+.legende b:first-child{margin-top:0}
+#carte-journal{flex:1;min-height:70px;display:flex;flex-direction:column}
+#journal{
+  list-style:none;overflow-y:auto;flex:1;min-height:0;
+  font-size:11.5px;color:#a79edd;display:flex;flex-direction:column;gap:5px;
+}
+#journal li{border-left:2px solid rgba(88,247,255,.35);padding-left:8px;line-height:1.35}
+#journal li.mvt{border-left-color:rgba(88,247,255,.16);color:#8d84c4}
+#journal li.sep{border-left-color:transparent;color:rgba(207,200,255,.5);letter-spacing:.1em}
+
+/* ---------- Toasts ---------- */
+#toasts{
+  position:fixed;top:76px;left:50%;transform:translateX(-50%);z-index:25;
+  display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;
+}
+.toast{
+  background:rgba(26,18,64,.96);border:1px solid rgba(74,63,158,.95);
+  color:#cfc8ff;padding:9px 20px;border-radius:11px;font-size:14px;
+  box-shadow:0 6px 26px rgba(0,0,0,.55),0 0 18px rgba(88,247,255,.08);
+  animation:toast-in .28s ease-out;transition:opacity .4s,transform .4s;
+}
+.toast.sortie{opacity:0;transform:translateY(-8px)}
+@keyframes toast-in{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
+
+/* ---------- Modales ---------- */
+.modal{
+  position:fixed;inset:0;z-index:40;background:rgba(9,5,26,.74);
+  display:flex;align-items:center;justify-content:center;padding:20px;
+  backdrop-filter:blur(3px);
+}
+.cache{display:none!important}
+.modal .boite{
+  width:min(660px,94vw);max-height:84vh;overflow-y:auto;
+  background:#1a1240;border:1px solid rgba(74,63,158,.85);border-radius:15px;
+  padding:30px 34px;box-shadow:0 20px 70px rgba(0,0,0,.6);
+}
+.modal h2{
+  font-family:Georgia,serif;font-weight:600;letter-spacing:.24em;
+  color:#ff5fd2;font-size:22px;margin-bottom:4px;
+  text-shadow:0 0 16px rgba(255,95,210,.3);
+}
+.modal .sous{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:rgba(207,200,255,.55);margin-bottom:16px}
+.modal .regles{font-size:13.5px;line-height:1.62;color:#cfc8ff}
+.modal .regles h4{
+  color:#58f7ff;font-size:13px;letter-spacing:.12em;text-transform:uppercase;
+  margin:16px 0 5px;padding-bottom:3px;border-bottom:1px solid rgba(74,63,158,.55);
+}
+.modal .regles b{color:#e9e3ff}
+.pourquoi{
+  margin-top:18px;padding:11px 14px;border-radius:9px;
+  background:rgba(88,247,255,.06);border:1px solid rgba(88,247,255,.32);
+  font-size:12.5px;color:#cfc8ff;line-height:1.5;
+}
+.fermer{margin-top:18px}
+#boite-victoire{text-align:center;width:min(430px,92vw)}
+#titre-victoire{font-size:34px;letter-spacing:.3em;margin-bottom:6px}
+#texte-victoire{color:#cfc8ff;font-size:14.5px;margin-bottom:20px;line-height:1.5}
+
+/* ---------- Écran d'accueil ---------- */
+/* Voile léger : le plateau holo et les particules restent bien visibles derrière. */
+#modale-accueil{z-index:60;background:rgba(9,5,26,.42);backdrop-filter:none;display:block;padding:0}
+#boite-accueil{position:absolute;inset:0;width:auto;max-height:none;overflow:visible;
+  background:none;border:none;box-shadow:none;padding:0;text-align:center}
+#accueil-titre{position:absolute;top:11vh;left:0;right:0}
+#boite-accueil h2{font-size:40px;letter-spacing:.5em;margin-bottom:4px}
+#accueil-sous{font-size:11.5px;letter-spacing:.26em;text-transform:uppercase;color:rgba(207,200,255,.7)}
+.menu-desc{display:block;font-size:11.5px;color:#a79edd;margin-top:4px;font-weight:400;
+  letter-spacing:.03em;line-height:1.4}
+#btn-choix-ia{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:min(330px,86vw);min-width:260px;min-height:106px;padding:16px 26px;border-radius:14px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;
+  font-size:19px;letter-spacing:.05em;
+}
+#btn-choix-ia .menu-desc{margin-top:0;text-align:center}
+#accueil-secondaires{position:absolute;left:50%;top:calc(50% + 80px);transform:translateX(-50%);
+  width:min(470px,88vw);display:flex;flex-direction:column;gap:8px;text-align:left}
+#accueil-secondaires button{display:block;width:100%;padding:9px 14px;border-radius:11px;
+  text-align:left;font-size:13.5px;letter-spacing:.04em}
+#accueil-statut{position:absolute;left:50%;bottom:11vh;transform:translateX(-50%);
+  width:min(600px,90vw);min-height:22px;font-size:13px;color:#cfc8ff;line-height:1.5;text-align:center}
+#btn-accueil-annuler{position:absolute;left:50%;bottom:5vh;transform:translateX(-50%)}
+.pulse-txt{animation:pulse-txt 1.3s ease-in-out infinite}
+@keyframes pulse-txt{0%,100%{opacity:.5}50%{opacity:1}}
+@media (max-height:660px){
+  #accueil-titre{top:52px}
+  #boite-accueil h2{font-size:30px}
+  #btn-choix-ia{min-height:92px;font-size:16px}
+  #accueil-secondaires{top:calc(50% + 62px)}
+  #accueil-secondaires .menu-desc{display:none}
+  #accueil-statut{bottom:9vh}
+}
+
+/* ---------- Déconnexion en ligne ---------- */
+#boite-deconnexion{text-align:center;width:min(430px,92vw)}
+#texte-deconnexion{color:#cfc8ff;font-size:14px;line-height:1.55;margin:12px 0 20px}
+
+/* ---------- Petit écran ---------- */
+@media (max-width:979px){
+  #panneau{
+    top:auto;left:10px;right:10px;bottom:10px;width:auto;
+    flex-direction:row;flex-wrap:wrap;max-height:44vh;
+  }
+  #panneau .carte{flex:1 1 160px}
+  #carte-journal{flex:2 1 220px}
+  .titre-bloc h1{font-size:22px}
+  .titre-bloc p{display:none}
+  #accueil-statut{bottom:47vh}
+}
+</style>
+</head>
+<body>
+<canvas id="plateau"></canvas>
+
+<header id="entete">
+  <div class="titre-bloc">
+    <h1>ONDE</h1>
+    <p data-i18n="sousTitre">Pieces in superposition</p>
+  </div>
+  <div class="boutons">
+    <button id="btn-langue" class="mini" data-i18n-title="langTitre">FR</button>
+    <button id="btn-son" class="mini" data-i18n-title="sonTitre">Sound: on</button>
+    <button id="btn-accueil" class="mini cache" data-i18n="accueil">Home</button>
+    <button id="btn-regles" data-i18n="regles">Rules</button>
+    <button id="btn-quitter-salon" class="cache" data-i18n="quitterSalon">Leave room</button>
+    <button id="btn-nouvelle" class="primary" data-i18n="nouvelle">New game</button>
+  </div>
+</header>
+
+<aside id="panneau">
+  <div class="carte" id="carte-tour">
+    <div id="pastille-tour"></div>
+    <div>
+      <div id="nom-tour">Azur</div>
+      <div id="detail-tour" data-i18n="auTour">your turn</div>
+    </div>
+  </div>
+  <div class="carte">
+    <div id="indice" data-i18n="indiceSel">Select one of your pieces.</div>
+    <div class="modes cache" id="modes">
+      <button id="btn-mode-deplacer" class="actif" data-i18n="btnDeplacer">Move</button>
+      <button id="btn-mode-scinder" data-i18n="btnScinder">Split</button>
+    </div>
+    <div id="compteur-split" class="cache"></div>
+    <button id="btn-confirmer-split" class="primary cache" data-i18n="btnConfirmer">Confirm split</button>
+    <button id="btn-reduire" class="primary cache" data-i18n="btnReduire">Collapse this ghost</button>
+  </div>
+  <div class="carte legende">
+    <div class="legende-txt" data-i18n-html="legende"><b>Core</b>king, 1 cell<b>Wave</b>1–2 cells in a line<b>Ghost</b>50/50 superposition</div>
+    <canvas id="leg-noyau" width="46" height="46"></canvas>
+    <canvas id="leg-onde" width="46" height="46"></canvas>
+    <canvas id="leg-fantome" width="46" height="46"></canvas>
+  </div>
+  <div class="carte" id="carte-journal">
+    <h3 data-i18n="journalTitre">Log</h3>
+    <ul id="journal"></ul>
+  </div>
+</aside>
+
+<div id="toasts"></div>
+
+<div class="modal cache" id="modale-regles">
+  <div class="boite">
+    <h2>ONDE</h2>
+    <div class="sous" data-i18n="reglesSous">Pieces in superposition — full rules</div>
+    <div class="regles"></div>
+    <button class="fermer primary" id="btn-fermer-regles" data-i18n="fermer">Close</button>
+  </div>
+</div>
+
+<div class="modal cache" id="modale-victoire">
+  <div class="boite" id="boite-victoire">
+    <h2 id="titre-victoire">VICTORY</h2>
+    <p id="texte-victoire"></p>
+    <button class="primary" id="btn-rejouer" data-i18n="rejouer">Play again</button>
+    <button class="cache" id="btn-quitter-fin" data-i18n="quitterSalon">Leave room</button>
+  </div>
+</div>
+
+<div class="modal" id="modale-accueil">
+  <div id="boite-accueil">
+    <div id="accueil-titre">
+      <h2>ONDE</h2>
+      <div id="accueil-sous" data-i18n="accueilSous">Pieces in superposition — quantum lab</div>
+    </div>
+    <button id="btn-choix-ia" class="primary">
+      <span data-i18n="accueilIa">Play against the AI</span>
+      <span class="menu-desc" data-i18n="accueilIaDesc">You are Azur, the computer plays Corail (Normal) — it never reads the ghosts' real positions.</span>
+    </button>
+    <div id="accueil-secondaires">
+      <button id="btn-ia-facile" data-i18n="accueilFacile">Against the AI — Easy level</button>
+      <button id="btn-choix-hotseat">
+        <span data-i18n="accueilHotseat">Two players — same screen</span>
+        <span class="menu-desc" data-i18n="accueilHotseatDesc">Azur and Corail alternate at this screen; the built-in referee draws fair random collapses.</span>
+      </button>
+      <button id="btn-choix-ligne">
+        <span data-i18n="accueilLigne">Online — LOB7 room</span>
+        <span class="menu-desc" data-i18n="accueilLigneDesc">Two browsers in the same room; the smaller identifier becomes Azur, the host-referee.</span>
+      </button>
+    </div>
+    <div id="accueil-statut"></div>
+    <button class="mini cache" id="btn-accueil-annuler" data-i18n="annuler">Cancel</button>
+  </div>
+</div>
+
+<div class="modal cache" id="modale-deconnexion">
+  <div class="boite" id="boite-deconnexion">
+    <h2 data-i18n="salonInterrompu">ROOM DISCONNECTED</h2>
+    <p id="texte-deconnexion"></p>
+    <button class="primary" id="btn-deconnexion-accueil" data-i18n="retourAccueil">Back to home</button>
+  </div>
+</div>
+
+<script>
+/* ===== Copie INLINE du SDK LOB7 Rooms (lob7-rooms.js, examples/prism-pair). =====
+   Aucune dépendance externe : le fichier reste autonome en file://. */
+(function () {
+  'use strict';
+  var PARENT_ORIGINS = ['https://lob7.com', 'https://www.lob7.com'];
+  var active = null;
+  var connecting = null;
+  function identifier() {
+    var bytes = new Uint8Array(16);
+    globalThis.crypto.getRandomValues(bytes);
+    return Array.from(bytes, function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+  }
+  function errorFrom(value) {
+    var error = new Error(value.message || 'Room request failed.');
+    error.code = value.code || 'ROOM_REQUEST_FAILED';
+    if (Number.isInteger(value.status)) error.status = value.status;
+    if (Number.isFinite(value.retryAfterSeconds)) error.retryAfterSeconds = value.retryAfterSeconds;
+    return error;
+  }
+  function validData(value) {
+    var todo = [{ value: value, depth: 0 }], seen = new Set(), nodes = 0;
+    while (todo.length) {
+      var item = todo.pop(), current = item.value;
+      if (++nodes > 8192 || item.depth > 64) return false;
+      if (typeof current === 'string') { if (current.length > 8192) return false; continue; }
+      if (current === null || typeof current === 'boolean') continue;
+      if (typeof current === 'number') { if (!Number.isFinite(current)) return false; continue; }
+      if (typeof current !== 'object' || seen.has(current)) return false;
+      seen.add(current);
+      if (!Array.isArray(current) && Object.getPrototypeOf(current) !== Object.prototype && Object.getPrototypeOf(current) !== null) return false;
+      var keys = Object.keys(current);
+      if (keys.length + todo.length > 8192 || keys.some(function (key) { return key.length > 8192; })) return false;
+      if (Array.isArray(current) && (current.length > 8192 || keys.length !== current.length)) return false;
+      Object.values(current).forEach(function (child) { todo.push({ value: child, depth: item.depth + 1 }); });
+    }
+    try { return new TextEncoder().encode(JSON.stringify(value)).byteLength <= 8192; } catch (_) { return false; }
+  }
+  function connection(room, port) {
+    var pending = new Map(), stopped = false, stopSubscription = null, subscriptionError = null, disconnectListeners = new Set();
+    function disconnect(reason) {
+      if (stopped) return;
+      stopped = true;
+      globalThis.removeEventListener('pagehide', leaveOnExit);
+      disconnectListeners.forEach(function (listener) { listener(errorFrom(reason)); });
+      disconnectListeners.clear();
+      var onError = subscriptionError;
+      if (stopSubscription) stopSubscription();
+      if (onError) { try { onError(errorFrom(reason)); } catch (_) { /* observer only */ } }
+      pending.forEach(function (task) { globalThis.clearTimeout(task.timer); task.reject(errorFrom(reason)); });
+      pending.clear();
+      port.close();
+      if (active === result) active = null;
+    }
+    port.onmessage = function (event) {
+      var response = event.data;
+      if (response && response.type === 'disconnected') return disconnect(response.error || { code: 'ROOM_CHANGED' });
+      var task = response && pending.get(response.requestId);
+      if (!task) return;
+      globalThis.clearTimeout(task.timer);
+      pending.delete(response.requestId);
+      if (response.error) task.reject(errorFrom(response.error));
+      else task.resolve(response.result);
+    };
+    port.onmessageerror = function () { disconnect({ code: 'ROOM_CONNECTION_CLOSED', message: 'The room connection closed. Connect again.' }); };
+    port.start();
+    function request(method, params) {
+      if (stopped) return Promise.reject(errorFrom({ code: 'ROOM_CONNECTION_CLOSED', message: 'Connect to the selected room again.' }));
+      if (pending.size >= 4) return Promise.reject(errorFrom({ code: 'ROOM_BUSY', message: 'Too many requests are in progress.', retryAfterSeconds: 3 }));
+      var id = identifier();
+      return new Promise(function (resolve, reject) {
+        var timer = globalThis.setTimeout(function () {
+          pending.delete(id);
+          reject(errorFrom({ code: 'ROOM_TIMEOUT', message: 'The room request timed out. Retry a send using the same idempotency key.' }));
+        }, 25000);
+        pending.set(id, { resolve: resolve, reject: reject, timer: timer });
+        try { port.postMessage({ requestId: id, method: method, params: params }); }
+        catch (_) { globalThis.clearTimeout(timer); pending.delete(id); reject(errorFrom({ code: 'ROOM_PAYLOAD_INVALID' })); }
+      });
+    }
+    var result = {
+      room: room,
+      read: function (options) {
+        options = options || {};
+        return request('read', { after: options.after === undefined ? 0 : options.after, limit: options.limit === undefined ? 50 : options.limit }).then(function (batch) {
+          if (Number.isSafeInteger(batch.cursor)) room.lastSequence = Math.max(room.lastSequence || 0, batch.cursor);
+          return batch;
+        });
+      },
+      send: function (data, options) {
+        var key = options && options.idempotencyKey || identifier();
+        var promise = validData(data)
+          ? request('send', { data: data, idempotencyKey: key })
+          : Promise.reject(errorFrom({ code: 'ROOM_PAYLOAD_INVALID', message: 'Use finite JSON data no larger than 8192 UTF-8 bytes.' }));
+        return promise.then(function (response) { return response.message; }).catch(function (error) { error.idempotencyKey = key; throw error; });
+      },
+      subscribe: function (callback, options) {
+        options = options || {};
+        if (typeof callback !== 'function') throw new TypeError('subscribe requires a callback.');
+        if (stopSubscription) throw errorFrom({ code: 'ROOM_SUBSCRIPTION_EXISTS', message: 'Stop the current subscription before starting another.' });
+        if (stopped) throw errorFrom({ code: 'ROOM_CONNECTION_CLOSED', message: 'Connect to the selected room again.' });
+        var cursor = options.after === undefined ? 0 : options.after;
+        if (!Number.isSafeInteger(cursor) || cursor < 0) throw new TypeError('after must be a nonnegative integer.');
+        var cancelled = false, timer = null, delay = 3000;
+        function stop() { cancelled = true; if (timer !== null) globalThis.clearTimeout(timer); if (stopSubscription === stop) { stopSubscription = null; subscriptionError = null; } }
+        async function poll() {
+          if (cancelled || stopped) return;
+          try {
+            var batch = await result.read({ after: cursor });
+            for (var message of batch.messages) {
+              if (cancelled || stopped) return;
+              await callback(message);
+              cursor = message.sequence;
+            }
+            cursor = Math.max(cursor, batch.cursor);
+            delay = batch.messages.length ? 3000 : Math.min(delay * 1.5, 15000);
+            delay = Math.max(delay, (batch.pollAfterSeconds || 3) * 1000);
+          } catch (error) {
+            if (cancelled || stopped) return;
+            if (['ROOM_EXPIRED', 'ROOM_NOT_FOUND', 'RELEASE_NOT_FOUND', 'ACCOUNT_SUSPENDED', 'GAME_NOT_ALLOWED', 'SCOPE_REQUIRED', 'AUTH_INVALID', 'AUTH_REQUIRED'].includes(error.code)) {
+              disconnect(error);
+              return;
+            }
+            delay = Math.max(Math.min(delay * 2, 30000), (error.retryAfterSeconds || 0) * 1000);
+            if (typeof options.onError === 'function') { try { options.onError(error); } catch (_) { /* callback cannot break cleanup */ } }
+          }
+          if (!cancelled && !stopped) timer = globalThis.setTimeout(poll, delay + Math.floor(Math.random() * 250));
+        }
+        stopSubscription = stop;
+        subscriptionError = typeof options.onError === 'function' ? options.onError : null;
+        void poll();
+        return stop;
+      },
+    };
+    if (typeof globalThis.LOB7RoomsP2P === 'function') result.connectPeer = function (options) {
+      return globalThis.LOB7RoomsP2P(result, options, function (listener) {
+        if (stopped) throw errorFrom({ code: 'ROOM_CONNECTION_CLOSED', message: 'Connect to the selected room again.' });
+        disconnectListeners.add(listener);
+        return function () { disconnectListeners.delete(listener); };
+      }, { identifier: identifier, errorFrom: errorFrom, validData: validData });
+    };
+    function leaveOnExit(event) {
+      if (event.persisted) return;
+      disconnect({ code: 'ROOM_CONNECTION_CLOSED', message: 'The game document closed.' });
+    }
+    globalThis.addEventListener('pagehide', leaveOnExit);
+    return result;
+  }
+  function connect() {
+    if (active) return Promise.resolve(active);
+    if (connecting) return connecting;
+    if (globalThis.parent === globalThis) return Promise.reject(errorFrom({ code: 'ROOM_PREVIEW_REQUIRED', message: 'Open this project in its LOB7 preview and choose a room.' }));
+    connecting = new Promise(function (resolve, reject) {
+      var nonce = identifier(), requestId = identifier(), timeout, deferred;
+      function cleanup() {
+        globalThis.removeEventListener('message', receive);
+        globalThis.removeEventListener('load', ready);
+        globalThis.clearTimeout(timeout);
+        if (deferred !== undefined) globalThis.clearTimeout(deferred);
+      }
+      function receive(event) {
+        var response = event.data;
+        if (event.source !== globalThis.parent || !PARENT_ORIGINS.includes(event.origin) || !response || response.type !== 'lob7.rooms.connected'
+          || response.nonce !== nonce || response.requestId !== requestId) return;
+        cleanup();
+        if (response.error) return reject(errorFrom(response.error));
+        if (!response.room || !event.ports[0]) return reject(errorFrom({ code: 'ROOM_PROTOCOL_INVALID' }));
+        active = connection(response.room, event.ports[0]);
+        resolve(active);
+      }
+      // Run after the parent's iframe load handler has invalidated any previous document.
+      function ready() { deferred = globalThis.setTimeout(function () { PARENT_ORIGINS.forEach(function (origin) { globalThis.parent.postMessage({ type: 'lob7.rooms.connect', nonce: nonce, requestId: requestId }, origin); }); }, 0); }
+      globalThis.addEventListener('message', receive);
+      timeout = globalThis.setTimeout(function () { cleanup(); reject(errorFrom({ code: 'ROOM_BRIDGE_UNAVAILABLE', message: 'This document is not connected to the LOB7 room panel.' })); }, 8000);
+      if (globalThis.document.readyState === 'complete') ready();
+      else globalThis.addEventListener('load', ready, { once: true });
+    }).finally(function () { connecting = null; });
+    return connecting;
+  }
+  globalThis.LOB7Rooms = Object.freeze({ connect: connect });
+})();
+</script>
+
+<script>
+"use strict";
+/* =====================================================================
+   ONDE — jeu de stratégie à superposition.
+   Architecture : état logique (state) totalement séparé du rendu
+   (vue.sprites / vue.fx / tweens). Coordonnées axiales (q,r),
+   hexagones pointus (pointy-top). Aucune dépendance, aucun réseau.
+   ===================================================================== */
+
+/* ---------------- Internationalisation ---------------- */
+/* Anglais par défaut, bascule FR via le bouton d'en-tête ; mémorisé en
+   sessionStorage (silencieux sous file://). « ONDE » et Azur/Corail inchangés. */
+var LANG="en";
+try{
+  var stockLang=sessionStorage.getItem("onde-lang");
+  if(stockLang==="fr"||stockLang==="en")LANG=stockLang;
+}catch(e){/* file:// ou stockage indisponible : on garde la valeur par défaut */}
+var STR={
+en:{
+  titre:"ONDE — Pieces in superposition",
+  sousTitre:"Pieces in superposition",
+  langTitre:"Switch to French",
+  sonTitre:"Turn the sound effects on or off",
+  sonOui:"Sound: on",sonNon:"Sound: off",
+  accueil:"Home",regles:"Rules",quitterSalon:"Leave room",nouvelle:"New game",
+  auTour:"your turn",sufIA:" (AI)",sufVous:" (you)",
+  matCore:"1 Core",matOnde1:"1 solid Wave",matOndeN:"{n} solid Waves",
+  matFantome1:"1 Ghost",matFantomeN:"{n} Ghosts",
+  journalTitre:"Log",
+  btnDeplacer:"Move",btnScinder:"Split",btnConfirmer:"Confirm split",btnReduire:"Collapse this ghost",
+  legende:'<b>Core</b>king, 1 cell<b>Wave</b>1–2 cells in a line<b>Ghost</b>50/50 superposition',
+  indiceSel:"Select one of your pieces.",
+  indiceSelCamp:"Select one of your {camp} pieces.",
+  indiceFantome:"Ghost in 50/50 superposition on {cells}.<br>Collapse it to draw its real cell.",
+  indiceNoyau:"The Core moves exactly one cell.",
+  depl1:"1 possible move — or switch to Split mode.",
+  deplN:"{n} possible moves — or switch to Split mode.",
+  indiceSci:"Pick two empty reachable cells, then confirm.",
+  cpt1:"{n}/2 cell chosen",cptN:"{n}/2 cells chosen",
+  et:"and",
+  finPartie:"Game over.",
+  iaPense:'The AI is thinking<span class="pulse-txt">…</span>',
+  coupTransmis:"Move sent — the host-referee is validating…",
+  auTourDe:"Waiting for {camp}…",
+  fermer:"Close",
+  reglesSous:"Pieces in superposition — full rules",
+  reglesHTML:"<h4>Board and material</h4>"+
+    "An hexagon of 37 cells (radius 3). Each side has one <b>Core</b> (the king) and three <b>Waves</b>. "+
+    "Azur occupies the bottom row, Corail the top one, mirrored. Cells are named a1 … g7. <b>Azur starts.</b>"+
+    "<h4>Solid and ghost</h4>"+
+    "A piece is either <b>solid</b> (a single cell) or a <b>ghost</b>: a wave in 50/50 superposition then "+
+    "occupies <b>two cells</b>, both shown dotted with a “?”. Nobody — not even its owner — knows which one "+
+    "it is really on: the position exists only as a probability, and only a draw can reveal it."+
+    "<h4>Turn of play — a single action</h4>"+
+    "<b>1. Move</b> a solid piece: a Wave slides in a straight line by 1 or 2 cells (6 directions, never "+
+    "jumping over a solid piece); the Core by exactly 1 cell. Landing on your own pieces, solid or ghost, "+
+    "is forbidden.<br>"+
+    "<b>2. Split</b> a solid Wave: it leaves its cell and becomes a 50/50 ghost over <b>two distinct empty "+
+    "cells</b>, each reachable by a legal Wave move (fully cleared path). The Core never splits; a ghost "+
+    "neither moves nor splits.<br>"+
+    "<b>3. Collapse</b> one of your ghosts: a fair 50/50 draw — one of the two cells becomes the solid "+
+    "wave, the other evaporates."+
+    "<h4>Interaction = collapse</h4>"+
+    "As soon as a ghost is attacked, crossed or collapsed, <b>it collapses first</b>. Then, if the survivor "+
+    "sits on the cell targeted by the attacker, it is <b>captured</b> if the attacker is an enemy (the "+
+    "attacker takes its place); if the survivor is elsewhere, the attack <b>passes through</b> (the cell is "+
+    "actually empty). A 2-cell slide that meets a ghost on the first cell collapses it, then carries on. "+
+    "A ghost cell <b>blocks</b> until it is collapsed: entering it triggers the collapse — this also applies "+
+    "to your own ghosts (only a draw can then bar your way)."+
+    "<h4>Capture and victory</h4>"+
+    "Landing on an enemy solid piece captures it (a ghost does not capture, since it never moves, but it "+
+    "can be collapsed or captured through interaction). <b>Capturing the enemy Core immediately wins the "+
+    "game.</b>"+
+    "<h4>Against the AI</h4>"+
+    "You play <b>Azur</b>, the AI plays <b>Corail</b>. It only reads the public board: ghosts — its own as "+
+    "well as yours — remain 50/50 probabilities to it; it never consults any hidden real position. "+
+    "<b>Normal</b> level: greedy expected-value evaluation — sure capture of a solid (the Core first), ghost "+
+    "attacks counted at half value, splits to threaten or flee, collapses to consolidate, Core safety "+
+    "(distance, alignments). <b>Easy</b> level: about 60% random legal moves. During its turn, “The AI is "+
+    "thinking…” shows for about 800 ms, then the usual animations play its move — with no interstitial screen."+
+    "<h4>Online — LOB7 room</h4>"+
+    "Two browsers open in the same LOB7 room. Each client announces its identifier: the smaller one becomes "+
+    "<b>Azur</b>, the host-referee who holds the real state and draws the collapses; the other is <b>Corail</b> "+
+    "and proposes its moves, which the host validates, applies and sends back as a <b>public view</b> — "+
+    "solids, ghosts as two “?” cells, log — never the real positions. Messages limited to 8 KB, idempotency "+
+    "by key, a “Leave room” button and a dedicated screen on disconnection."+
+    '<div class="pourquoi">Honest note: the host-referee learns each draw as soon as it happens, and a '+
+    'malicious host could bias them — this mode relies on the trust granted to the host.</div>'+
+    '<div class="pourquoi">Why impossible before computers: hidden 50/50 superpositions and fair draws '+
+    'require a digital referee.</div>',
+  victoireTitre:"VICTORY",patTitre:"DRAW",
+  victoireTexte:"The {camp} win.",
+  rNoyau:"The {camp} Core has been captured.",
+  rNoyauCell:"The {camp} Core ({cell}) is captured — {adv} wins!",
+  rBloque:"No legal moves left for either side.",
+  rejouer:"Play again",
+  salonInterrompu:"ROOM DISCONNECTED",retourAccueil:"Back to home",
+  accueilSous:"Pieces in superposition — quantum lab",
+  accueilIa:"Play against the AI",
+  accueilIaDesc:"You are Azur, the computer plays Corail (Normal) — it never reads the ghosts' real positions.",
+  accueilFacile:"Against the AI — Easy level",
+  accueilHotseat:"Two players — same screen",
+  accueilHotseatDesc:"Azur and Corail alternate at this screen; the built-in referee draws fair random collapses.",
+  accueilLigne:"Online — LOB7 room",
+  accueilLigneDesc:"Two browsers in the same room; the smaller identifier becomes Azur, the host-referee.",
+  annuler:"Cancel",facile:"Easy",normal:"Normal",
+  motNoyau:"Core",motOnde:"Wave",
+  jMvt:"{camp}: {piece} {a} → {b}.",
+  toastReduire:"Collapse: the piece was actually on {cell}.",
+  jRedVol:"Voluntary collapse: the {camp} wave was actually on {cell}.",
+  jRedInt:"Collapse by interaction: the {camp} wave was actually on {cell}.",
+  toastNoyauTombe:"The Core has fallen!",toastCapture:"Capture!",
+  jPriseOnde:"Capture: the {camp} wave ({cell}) is taken by {adv}.",
+  toastFantomeChemin:"Your ghost materialized on the path: the piece stops.",
+  jInterrompu:"{camp}: move stopped by its own ghost ({cell}).",
+  toastScission:"Split!",
+  jScission:"Split: the {camp} wave superposes between {a} and {b}.",
+  toastPasse:"{camp} has no legal move: turn skipped.",
+  jPasse:"{camp}: no legal move, turn skipped.",
+  toastImmobile:"This piece cannot act.",
+  toastCasesVides:"Split requires empty cells.",
+  toastIllegal:"Illegal move.",
+  sepNouvelle:"— New game —",toastNouvelle:"New game — Azur starts.",
+  jSalonAzur:"— LOB7 room: you are Azur, host-referee —",
+  toastAzurHote:"You are Azur — host-referee. Azur starts: your move.",
+  statutAdvTrouve:"Opponent found — you are Corail; the host is starting the game…",
+  jSalonCorail:"— LOB7 room: you are Corail —",
+  toastCorail:"You are Corail. Azur (host-referee) starts.",
+  refusDefaut:"The host-referee refused the move.",
+  refusTour:"It is not Corail's turn.",
+  refusIllegal:"Move rejected by the referee: illegal.",
+  toastResync:"Resynchronized on the referee's view.",
+  hoteMuet:"the host-referee is not responding anymore.",
+  salonFerne:"the room closed the connection.",
+  statutConnexion:"Connecting to the LOB7 room…",
+  statutRecherche:"Room joined — searching for an opponent…",
+  echecPersonne:"No opponent answered in the room.",
+  horsLob7:"Outside LOB7: this mode requires opening the page in its LOB7 preview (lob7.com) and choosing a room.",
+  echecSalon:"Could not join the room: {msg}.",
+  lob7Indispo:"LOB7 unavailable",
+  decoPerdue:"Connection lost — {msg} Back to home.",
+  decoParti:"Your opponent left the room. Back to home."
+},
+fr:{
+  titre:"ONDE — Des pièces en superposition",
+  sousTitre:"Des pièces en superposition",
+  langTitre:"Passer en anglais",
+  sonTitre:"Activer ou couper les effets sonores",
+  sonOui:"Son : oui",sonNon:"Son : non",
+  accueil:"Accueil",regles:"Règles",quitterSalon:"Quitter le salon",nouvelle:"Nouvelle partie",
+  auTour:"au tour de jouer",sufIA:" (IA)",sufVous:" (vous)",
+  matCore:"1 Noyau",matOnde1:"1 onde solide",matOndeN:"{n} ondes solides",
+  matFantome1:"1 fantôme",matFantomeN:"{n} fantômes",
+  journalTitre:"Journal",
+  btnDeplacer:"Déplacer",btnScinder:"Scinder",btnConfirmer:"Confirmer la scission",btnReduire:"Réduire ce fantôme",
+  legende:'<b>Noyau</b>roi, 1 case<b>Onde</b>1–2 cases en ligne<b>Fantôme</b>superposition 50/50',
+  indiceSel:"Sélectionnez une de vos pièces.",
+  indiceSelCamp:"Sélectionnez une de vos pièces {camp}.",
+  indiceFantome:"Fantôme en superposition 50/50 sur {cells}.<br>Le réduire tire au sort sa case réelle.",
+  indiceNoyau:"Le Noyau se déplace d'exactement une case.",
+  depl1:"1 déplacement possible — ou passez en mode Scinder.",
+  deplN:"{n} déplacements possibles — ou passez en mode Scinder.",
+  indiceSci:"Choisissez deux cases vides accessibles, puis confirmez.",
+  cpt1:"{n}/2 case choisie",cptN:"{n}/2 cases choisies",
+  et:"et",
+  finPartie:"Partie terminée.",
+  iaPense:'L\'IA réfléchit<span class="pulse-txt">…</span>',
+  coupTransmis:"Coup transmis — l'hôte-arbitre valide…",
+  auTourDe:"Au tour de {camp}…",
+  fermer:"Fermer",
+  reglesSous:"Des pièces en superposition — règles complètes",
+  reglesHTML:"<h4>Plateau et matériel</h4>"+
+    "Un hexagone de 37 cases (rayon 3). Chaque camp dispose d'un <b>Noyau</b> (le roi) et de "+
+    "trois <b>Ondes</b>. Azur occupe la rangée du bas, Corail celle du haut, en miroir. "+
+    "Les cases se notent a1 … g7. <b>Azur commence.</b>"+
+    "<h4>Solide et fantôme</h4>"+
+    "Une pièce est <b>solide</b> (une seule case) ou <b>fantôme</b> : une onde en superposition "+
+    "50/50 occupe alors <b>deux cases</b>, toutes deux montrées en pointillés avec un « ? ». "+
+    "Personne — pas même son propriétaire — ne sait sur laquelle elle se trouve réellement : "+
+    "la position n'existe qu'en probabilité, et seul un tirage la révèle."+
+    "<h4>Tour de jeu — une seule action</h4>"+
+    "<b>1. Déplacer</b> une pièce solide : l'Onde glisse en ligne droite de 1 ou 2 cases "+
+    "(6 directions, sans sauter de pièce solide) ; le Noyau d'exactement 1 case. "+
+    "Interdit d'atterrir sur ses propres pièces, solides ou fantômes.<br>"+
+    "<b>2. Scinder</b> une Onde solide : elle quitte sa case et devient un fantôme 50/50 "+
+    "sur <b>deux cases vides distinctes</b>, chacune atteignable par un déplacement légal "+
+    "d'Onde (trajectoire totalement dégagée). Le Noyau ne se scinde jamais ; un fantôme "+
+    "ne bouge pas et ne se scinde pas.<br>"+
+    "<b>3. Réduire</b> un de ses fantômes : tirage équitable 50/50 — l'une des deux cases "+
+    "devient l'onde solide, l'autre s'évapore."+
+    "<h4>Interaction = réduction</h4>"+
+    "Dès qu'un fantôme est attaqué, traversé ou réduit, <b>il se réduit d'abord</b>. "+
+    "Puis, si le survivant occupe la case visée par l'attaquant, il est <b>capturé</b> "+
+    "si l'attaquant est ennemi (l'attaquant prend sa place) ; si le survivant est ailleurs, "+
+    "l'attaque <b>passe au travers</b> (la case est en réalité vide). Une traversée de "+
+    "2 cases qui rencontre un fantôme sur la première case le réduit, puis on continue. "+
+    "Une case fantôme <b>bloque</b> tant qu'elle n'est pas réduite : y entrer déclenche la "+
+    "réduction — cela vaut aussi pour vos propres fantômes (seul un tirage peut alors vous "+
+    "barrer la route)."+
+    "<h4>Capture et victoire</h4>"+
+    "Atterrir sur une pièce ennemie solide la capture (un fantôme ne capture pas, puisqu'il "+
+    "ne bouge pas, mais il peut être réduit ou capturé par interaction). "+
+    "<b>Capturer le Noyau adverse remporte immédiatement la partie.</b>"+
+    "<h4>Contre l'IA</h4>"+
+    "Vous jouez <b>Azur</b>, l'IA joue <b>Corail</b>. Elle ne lit que le plateau public : les "+
+    "fantômes — les siens comme les vôtres — restent pour elle des probabilités 50/50, elle ne "+
+    "consulte jamais une position réelle interne. Niveau <b>Normal</b> : évaluation gloutonne en "+
+    "espérance — capture sûre d'une solide (le Noyau en priorité), attaque de fantôme comptée à "+
+    "demi-valeur, scission pour menacer ou fuir, réduction pour consolider, sécurité du Noyau "+
+    "(distance, alignements). Niveau <b>Facile</b> : environ 60 % de coups aléatoires légaux. "+
+    "Pendant son tour, « L'IA réfléchit… » s'affiche environ 800 ms, puis les animations "+
+    "habituelles déroulent son coup — sans écran de passage."+
+    "<h4>En ligne — salon LOB7</h4>"+
+    "Deux navigateurs ouverts dans le même salon LOB7. Chaque client annonce son identifiant : "+
+    "le plus petit devient <b>Azur</b>, hôte-arbitre qui détient l'état réel et tire les "+
+    "réductions ; l'autre est <b>Corail</b> et propose ses coups, que l'hôte valide, applique "+
+    "et renvoie sous forme de <b>vue publique</b> — solides, fantômes en deux cases « ? », "+
+    "journal — jamais les positions réelles. Messages limités à 8 Ko, idempotence par clé, "+
+    "bouton « Quitter le salon » et écran dédié en cas de déconnexion."+
+    '<div class="pourquoi">Note honnête : l\'hôte-arbitre connaît les tirages dès qu\'ils surviennent et '+
+    'un hôte malveillant pourrait les biaiser — ce mode repose sur la confiance accordée à l\'hôte.</div>'+
+    '<div class="pourquoi">Pourquoi impossible avant l\'informatique : superpositions à probabilités cachées '+
+    'et tirages équitables exigent un arbitre numérique.</div>',
+  victoireTitre:"VICTOIRE",patTitre:"PAT",
+  victoireTexte:"Les {camp} l'emportent.",
+  rNoyau:"Le Noyau {camp} a été capturé.",
+  rNoyauCell:"Le Noyau {camp} ({cell}) est capturé — victoire {adv} !",
+  rBloque:"Plus aucun coup légal de part et d'autre.",
+  rejouer:"Rejouer",
+  salonInterrompu:"SALON INTERROMPU",retourAccueil:"Retour à l'accueil",
+  accueilSous:"Des pièces en superposition — laboratoire quantique",
+  accueilIa:"Contre l'IA",
+  accueilIaDesc:"Vous êtes Azur, l'ordinateur joue Corail (Normal) — sans jamais lire les positions réelles des fantômes.",
+  accueilFacile:"Contre l'IA — niveau Facile",
+  accueilHotseat:"Deux joueurs — même écran",
+  accueilHotseatDesc:"Azur et Corail alternent sur ce poste ; l'arbitre intégré tire les réductions au hasard équitable.",
+  accueilLigne:"En ligne — salon LOB7",
+  accueilLigneDesc:"Deux navigateurs dans le même salon ; le plus petit identifiant devient Azur, hôte-arbitre de la partie.",
+  annuler:"Annuler",facile:"Facile",normal:"Normal",
+  motNoyau:"Noyau",motOnde:"Onde",
+  jMvt:"{camp} : {piece} {a} → {b}.",
+  toastReduire:"Réduction : la pièce était en réalité sur {cell}.",
+  jRedVol:"Réduction volontaire : l'onde {camp} était en réalité sur {cell}.",
+  jRedInt:"Réduction par interaction : l'onde {camp} était en réalité sur {cell}.",
+  toastNoyauTombe:"Le Noyau est tombé !",toastCapture:"Capture !",
+  jPriseOnde:"Capture : l'onde {camp} ({cell}) est prise par {adv}.",
+  toastFantomeChemin:"Votre fantôme s'est matérialisé sur le chemin : la pièce s'arrête.",
+  jInterrompu:"{camp} : déplacement interrompu par son propre fantôme ({cell}).",
+  toastScission:"Scission !",
+  jScission:"Scission : l'onde {camp} se superpose entre {a} et {b}.",
+  toastPasse:"{camp} n'a aucun coup légal : tour passé.",
+  jPasse:"{camp} : aucun coup légal, tour passé.",
+  toastImmobile:"Cette pièce ne peut pas agir.",
+  toastCasesVides:"La scission exige des cases vides.",
+  toastIllegal:"Coup illégal.",
+  sepNouvelle:"— Nouvelle partie —",toastNouvelle:"Nouvelle partie — Azur commence.",
+  jSalonAzur:"— Salon LOB7 : vous êtes Azur, hôte-arbitre —",
+  toastAzurHote:"Vous êtes Azur — hôte-arbitre. Azur commence : à vous.",
+  statutAdvTrouve:"Adversaire trouvé — vous êtes Corail ; l'hôte lance la partie…",
+  jSalonCorail:"— Salon LOB7 : vous êtes Corail —",
+  toastCorail:"Vous êtes Corail. Azur (hôte-arbitre) commence.",
+  refusDefaut:"L'hôte-arbitre a refusé le coup.",
+  refusTour:"Ce n'est pas le tour de Corail.",
+  refusIllegal:"Coup refusé par l'arbitre : illégal.",
+  toastResync:"Resynchronisé sur la vue de l'arbitre.",
+  hoteMuet:"l'hôte-arbitre ne répond plus.",
+  salonFerne:"le salon a fermé la connexion.",
+  statutConnexion:"Connexion au salon LOB7…",
+  statutRecherche:"Salon rejoint — recherche d'un adversaire…",
+  echecPersonne:"Aucun adversaire n'a répondu dans le salon.",
+  horsLob7:"Hors LOB7 : ce mode demande d'ouvrir la page dans son aperçu LOB7 et de choisir un salon.",
+  echecSalon:"Impossible de rejoindre le salon : {msg}.",
+  lob7Indispo:"LOB7 indisponible",
+  decoPerdue:"Connexion perdue — {msg} Retour à l'accueil.",
+  decoParti:"Votre adversaire a quitté le salon. Retour à l'accueil."
+}
+};
+function T(k){
+  var s=STR[LANG]&&STR[LANG][k];
+  if(s===undefined)s=STR.en[k];
+  return s===undefined?k:s;
+}
+function fmt(s,args){
+  return String(s).replace(/\{(\w+)\}/g,function(m,k){
+    return args&&args[k]!==undefined?args[k]:m;
+  });
+}
+var sonActif=true;
+/* Raisons de fin de partie : stockées sous forme de clé (i18n à l'affichage,
+   y compris pour les vues reçues du salon LOB7) — pure présentation. */
+function mkOverCore(vainqueur,perdant,cell){
+  var o={vainqueur:vainqueur,cle:"noyau",perdant:perdant};
+  if(cell)o.cell=cell;
+  return o;
+}
+function mkOverBloque(){return {vainqueur:null,cle:"bloque"};}
+function texteRaison(o){
+  if(!o)return"";
+  if(o.raison)return o.raison;                    /* compat anciens états */
+  if(o.cle==="noyau")
+    return o.cell?fmt(T("rNoyauCell"),{camp:FR[o.perdant],adv:FR[o.vainqueur],cell:o.cell})
+                 :fmt(T("rNoyau"),{camp:FR[o.perdant]});
+  if(o.cle==="bloque")return T("rBloque");
+  return"";
+}
+function majTextes(){
+  var i,els=document.querySelectorAll("[data-i18n]");
+  for(i=0;i<els.length;i++)els[i].textContent=T(els[i].getAttribute("data-i18n"));
+  els=document.querySelectorAll("[data-i18n-html]");
+  for(i=0;i<els.length;i++)els[i].innerHTML=T(els[i].getAttribute("data-i18n-html"));
+  els=document.querySelectorAll("[data-i18n-title]");
+  for(i=0;i<els.length;i++)els[i].setAttribute("title",T(els[i].getAttribute("data-i18n-title")));
+  var r=document.querySelector("#modale-regles .regles");
+  if(r)r.innerHTML=T("reglesHTML");
+  document.getElementById("btn-langue").textContent=LANG==="en"?"FR":"EN";
+  document.getElementById("btn-son").textContent=sonActif?T("sonOui"):T("sonNon");
+}
+function setLang(l){
+  LANG=l==="fr"?"fr":"en";
+  try{sessionStorage.setItem("onde-lang",LANG);}catch(e){}
+  document.documentElement.lang=LANG;
+  document.title=T("titre");
+  majTextes();
+  if(state)syncPanneau();
+}
+document.getElementById("btn-langue").addEventListener("click",function(){
+  setLang(LANG==="en"?"fr":"en");
+});
+
+/* ---------------- Utilitaires ---------------- */
+var SQRT3 = Math.sqrt(3);
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+function easeInOut(k){return k<.5 ? 2*k*k : 1-Math.pow(-2*k+2,2)/2;}
+function easeOutCubic(k){return 1-Math.pow(1-k,3);}
+function easeOutBack(k){var c=1.70158;return 1+(c+1)*Math.pow(k-1,3)+c*Math.pow(k-1,2);}
+function shade(hex,f){
+  var n=parseInt(hex.slice(1),16),r=n>>16&255,g=n>>8&255,b=n&255;
+  if(f>=0){r+=(255-r)*f;g+=(255-g)*f;b+=(255-b)*f;}else{r*=1+f;g*=1+f;b*=1+f;}
+  return "rgb("+(r|0)+","+(g|0)+","+(b|0)+")";
+}
+function rgbaHex(hex,a){
+  var n=parseInt(hex.slice(1),16);
+  return "rgba("+(n>>16&255)+","+(n>>8&255)+","+(n&255)+","+a+")";
+}
+function hashSeed(s){var h=0;for(var i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return (h%1000)/157;}
+
+/* ---------------- Constantes ---------------- */
+/* Palette « Labo quantique » — azur/corail inchangés (identité des joueurs),
+   le reste est purement décoratif : aucune logique ne lit ces couleurs. */
+var COUL={
+  fond:"#120b2e",fond2:"#1a1240",
+  azur:"#6ec8ff",corail:"#ff9166",
+  magenta:"#ff5fd2",cyan:"#58f7ff",
+  grille:"#2f2a6b",contour:"#4a3f9e",survol:"#3a3480",
+  texte:"#cfc8ff"
+};
+var FR={azur:"Azur",corail:"Corail"};
+var DIRS=[[1,0],[1,-1],[0,-1],[-1,0],[-1,1],[0,1]];
+var RAYON=3;
+var CELLS=[];
+(function(){
+  for(var q=-RAYON;q<=RAYON;q++)
+    for(var r=-RAYON;r<=RAYON;r++)
+      if(Math.abs(q+r)<=RAYON)CELLS.push({q:q,r:r});   /* 37 cases */
+})();
+function dansPlateau(c){return Math.abs(c.q)<=RAYON&&Math.abs(c.r)<=RAYON&&Math.abs(c.q+c.r)<=RAYON;}
+function cle(c){return c.q+","+c.r;}
+function memeCase(a,b){return a.q===b.q&&a.r===b.r;}
+function nomCase(c){return "abcdefg"[c.q+3]+(c.r+4);}  /* d4 = centre */
+
+/* ---------------- Effets sonores (synthèse locale) ---------------- */
+var Snd=(function(){
+  var actx=null,actif=true;
+  function bip(f0,f1,duree,type,vol){
+    if(!actif)return;
+    try{
+      actx=actx||new (window.AudioContext||window.webkitAudioContext)();
+      var o=actx.createOscillator(),g=actx.createGain(),t=actx.currentTime;
+      o.type=type||"sine";
+      o.frequency.setValueAtTime(f0,t);
+      o.frequency.exponentialRampToValueAtTime(Math.max(30,f1),t+duree);
+      g.gain.setValueAtTime(vol||.1,t);
+      g.gain.exponentialRampToValueAtTime(.0001,t+duree);
+      o.connect(g);g.connect(actx.destination);
+      o.start(t);o.stop(t+duree+.03);
+    }catch(e){}
+  }
+  return {
+    deplacement:function(){bip(320,430,.13,"sine",.07);},
+    capture:function(){bip(210,60,.32,"square",.09);bip(600,120,.2,"sawtooth",.04);},
+    scission:function(){bip(480,760,.28,"triangle",.07);},
+    revelation:function(){bip(620,930,.16,"sine",.06);setTimeout(function(){bip(930,1240,.15,"sine",.05);},130);},
+    victoire:function(){[440,554,659,880].forEach(function(f,i){setTimeout(function(){bip(f,f,.26,"sine",.08);},i*130);});},
+    bascule:function(){actif=!actif;return actif;}
+  };
+})();
+
+/* ---------------- Couche d'intégration des assets ----------------
+   Charge dynamiquement assets/manifest.js via <script src> ; s'il est
+   absent (fichier ouvert seul), asset() renvoie null et le rendu
+   procédural prend le relais. Aucun fetch, aucun module ES. */
+var Assets=(function(){
+  var entrees=null;
+  var images=new Map();
+  function boot(){
+    var s=document.createElement("script");
+    s.src="assets/manifest.js";
+    s.onload=function(){
+      try{
+        var m=window.ASSETS_MANIFEST;
+        entrees=new Map();
+        (m&&m.assets||[]).forEach(function(e){entrees.set(e.id,e);});
+      }catch(e){entrees=new Map();}
+    };
+    s.onerror=function(){entrees=new Map();};
+    document.head.appendChild(s);
+  }
+  function asset(id,minPx){
+    if(!entrees)return null;
+    var e=entrees.get(id);
+    if(!e)return null;
+    var v=null,i,c;
+    if(e.variants&&e.variants.length){
+      for(i=0;i<e.variants.length;i++){
+        c=e.variants[i];
+        if(c.px>=minPx&&(!v||c.px<v.px))v=c;
+      }
+      if(!v)for(i=0;i<e.variants.length;i++){c=e.variants[i];if(!v||c.px>v.px)v=c;}
+    }else if(e.file){v={px:0,file:e.file};}
+    if(!v)return null;
+    var k=id+"@"+v.file,im=images.get(k);
+    if(im===undefined){
+      im=new Image();
+      im.onerror=function(){images.set(k,null);};
+      im.src="assets/"+v.file;
+      images.set(k,im);
+    }
+    if(!im||!im.complete||im.naturalWidth===0)return null;
+    return im;
+  }
+  return {boot:boot,asset:asset};
+})();
+
+/* ---------------- État logique ---------------- */
+var state=null,GEN=0,busy=false,sel=null,survol=null;
+/* Mode de jeu : "accueil" | "hotseat" | "ia" | "ligne".
+   Hotseat reste le chemin d'origine, inchangé ; les autres modes s'y superposent. */
+var MODE="accueil";
+var IA={niveau:"normal"};                 /* mode IA : l'humain est Azur, l'IA joue Corail */
+var enLigne=null;                         /* mode en ligne : cf. section « Salon LOB7 » */
+var TIRAGES_ATTM=null,TIRAGE_LOG=null;    /* tirages forcés (rejoueurs/arbitre) et journalisés */
+
+function piecesInitiales(){
+  var n=0;
+  function mk(joueur,type,q,r){return {id:"p"+(n++),joueur:joueur,type:type,mode:"solide",cell:{q:q,r:r},cells:null};}
+  return [
+    mk("azur","noyau",-1,3),
+    mk("azur","onde",-3,3),mk("azur","onde",-2,3),mk("azur","onde",0,3),
+    mk("corail","noyau",1,-3),
+    mk("corail","onde",0,-3),mk("corail","onde",2,-3),mk("corail","onde",3,-3)
+  ];
+}
+function parId(id){return state.pieces.find(function(p){return p.id===id;})||null;}
+/* Les fonctions d'occupation acceptent un tableau de pièces explicite (simulateur,
+   IA, arbitre en ligne) ; par défaut elles lisent l'état global. */
+function occupation(ps){
+  var pieces=ps||state.pieces,m=new Map();
+  pieces.forEach(function(p){
+    if(p.mode==="solide")m.set(cle(p.cell),p);
+    else{m.set(cle(p.cells[0]),p);m.set(cle(p.cells[1]),p);}
+  });
+  return m;
+}
+function pieceSur(c,ps){return occupation(ps).get(cle(c))||null;}
+function solideSur(c,ps){
+  var pieces=ps||state.pieces,r=null;
+  pieces.forEach(function(p){if(p.mode==="solide"&&memeCase(p.cell,c))r=p;});
+  return r;
+}
+function fantomeSur(c,ps){
+  var pieces=ps||state.pieces,r=null;
+  pieces.forEach(function(p){if(p.mode==="fantome"&&p.cells.some(function(x){return memeCase(x,c);}))r=p;});
+  return r;
+}
+function adversaire(j){return j==="azur"?"corail":"azur";}
+function tirageEquitable(){
+  if(window.crypto&&crypto.getRandomValues){
+    var a=new Uint8Array(1);crypto.getRandomValues(a);return a[0]&1;
+  }
+  return Math.random()<.5?0:1;
+}
+
+/* Déplacements légaux d'une pièce solide (miroir exact de la résolution). */
+function deplacements(p,ps){
+  var res=[],occ=occupation(ps),portee=p.type==="noyau"?1:2;
+  DIRS.forEach(function(d){
+    var c1={q:p.cell.q+d[0],r:p.cell.r+d[1]};
+    if(!dansPlateau(c1))return;
+    var o1=occ.get(cle(c1));
+    if(!(o1&&o1.joueur===p.joueur))
+      res.push({q:c1.q,r:c1.r,dist:1,dq:d[0],dr:d[1]});
+    if(portee===2){
+      var c2={q:c1.q+d[0],r:c1.r+d[1]};
+      if(!dansPlateau(c2))return;
+      if(o1&&o1.mode==="solide")return;       /* pas de saut au-dessus d'un solide */
+      var o2=occ.get(cle(c2));
+      if(o2&&o2.joueur===p.joueur)return;     /* jamais sur ses propres pièces */
+      res.push({q:c2.q,r:c2.r,dist:2,dq:d[0],dr:d[1]});
+    }
+  });
+  return res;
+}
+/* Cases de scission : cases VIDES, atteignables par un déplacement légal
+   d'Onde, trajectoire totalement dégagée (intermédiaire vide aussi). */
+function casesScission(p,ps){
+  var res=[],occ=occupation(ps);
+  DIRS.forEach(function(d){
+    var c1={q:p.cell.q+d[0],r:p.cell.r+d[1]};
+    if(!dansPlateau(c1))return;
+    if(!occ.has(cle(c1)))res.push({q:c1.q,r:c1.r});
+    var c2={q:c1.q+d[0],r:c1.r+d[1]};
+    if(!dansPlateau(c2))return;
+    if(occ.has(cle(c1)))return;
+    if(!occ.has(cle(c2)))res.push({q:c2.q,r:c2.r});
+  });
+  return res;
+}
+function peutAgir(joueur,ps){
+  var pieces=ps||state.pieces,ok=false;
+  pieces.forEach(function(p){
+    if(p.joueur!==joueur||ok)return;
+    if(p.mode==="fantome"){ok=true;return;}
+    if(deplacements(p,pieces).length){ok=true;return;}
+    if(p.type==="onde"&&casesScission(p,pieces).length)ok=true;
+  });
+  return ok;
+}
+
+/* ---------------- Simulateur pur (IA, validation, arbitre en ligne) ----------------
+   Miroir exact de actionDeplacer / actionScinder / actionReduire, sans aucun rendu :
+   - tiragesF = null   → énumération probabiliste : feuilles [{p, pieces, turn, over}]
+   - tiragesF = [k, …] → issue unique déterministe (validation + tirages consommés).
+   Une action ne consomme jamais plus de 2 tirages (traversée de 2 cases fantômes). */
+function clonerPieces(ps){
+  return ps.map(function(p){
+    return {id:p.id,joueur:p.joueur,type:p.type,mode:p.mode,
+            cell:p.cell?{q:p.cell.q,r:p.cell.r}:null,
+            cells:p.cells?p.cells.map(function(c){return {q:c.q,r:c.r};}):null};
+  });
+}
+function simulerAction(piecesDepart,tour,action,tiragesF){
+  var FORCE=Array.isArray(tiragesF);
+  var feuilles=[],tiragesUses=[];
+  var pieces=clonerPieces(piecesDepart);
+  function parIdS(id,ps){for(var i=0;i<ps.length;i++)if(ps[i].id===id)return ps[i];return null;}
+  var p=parIdS(action.id,pieces);
+  var ok=!!p&&p.joueur===tour;
+  function feuille(pc,prob,over){                    /* même logique de fin de tour que finDeTour */
+    var turn2=tour,over2=over||null;
+    if(!over2){
+      var sui=adversaire(tour);
+      if(peutAgir(sui,pc))turn2=sui;
+      else if(!peutAgir(tour,pc))over2=mkOverBloque();
+    }
+    var e={p:prob,pieces:pc,turn:turn2,over:over2};
+    if(FORCE)feuilles[0]=e;else feuilles.push(e);
+  }
+  if(ok&&action.t==="dep"&&p.mode==="solide"){
+    var mvs=deplacements(p,pieces),mv=null,i;
+    for(i=0;i<mvs.length;i++)
+      if(mvs[i].dq===action.dq&&mvs[i].dr===action.dr&&mvs[i].dist===action.dist)mv=mvs[i];
+    if(!mv)ok=false;
+    else{
+      var depart={q:p.cell.q,r:p.cell.r};
+      function etape(s,pc,prob,over){                /* étape s du glissement, depuis l'origine */
+        var next={q:depart.q+s*action.dq,r:depart.r+s*action.dr};
+        var gh=fantomeSur(next,pc);
+        if(!gh){suite(pc,prob,s,over);return;}
+        var ks=FORCE?[tiragesF[tiragesUses.length]]:[0,1],ki,k;
+        for(ki=0;ki<ks.length;ki++){
+          k=ks[ki];
+          if(FORCE)tiragesUses.push(k);
+          var b=FORCE?pc:clonerPieces(pc);
+          var gb=fantomeSur(next,b);
+          var surv=gb.cells[k];
+          gb.mode="solide";gb.cell={q:surv.q,r:surv.r};gb.cells=null;
+          var pb=parIdS(action.id,b);
+          if(memeCase(surv,next)){
+            if(gb.joueur!==pb.joueur){               /* survivant ennemi sur la case : capture */
+              pb.cell={q:next.q,r:next.r};
+              feuille(b.filter(function(x){return x!==gb;}),prob*(FORCE?1:.5),over);
+            }else feuille(b,prob*(FORCE?1:.5),over); /* propre fantôme matérialisé : arrêt */
+          }else{                                     /* passé au travers : suite() avance et poursuit */
+            suite(b,prob*(FORCE?1:.5),s,over);
+          }
+        }
+      }
+      function suite(pc,prob,s,over){
+        var next={q:depart.q+s*action.dq,r:depart.r+s*action.dr};
+        var pb=parIdS(action.id,pc);
+        if(s<action.dist){
+          if(solideSur(next,pc)){feuille(pc,prob,over);return;}   /* garde-fou : arrêt avant l'obstacle */
+          pb.cell={q:next.q,r:next.r};
+          etape(s+1,pc,prob,over);
+          return;
+        }
+        var sol=solideSur(next,pc);                  /* occupant AVANT l'arrivée (pré-filtré : ennemi) */
+        pb.cell={q:next.q,r:next.r};
+        if(sol&&sol.joueur!==pb.joueur){
+          var b2=pc.filter(function(x){return x!==sol;});
+          if(sol.type==="noyau")
+            over=mkOverCore(pb.joueur,sol.joueur,nomCase(next));
+          feuille(b2,prob,over);
+        }else feuille(pc,prob,over);
+      }
+      etape(1,pieces,1,null);
+    }
+  }else if(ok&&action.t==="sci"&&p.mode==="solide"&&p.type==="onde"){
+    var cs=casesScission(p,pieces),trouve=false,a,bI;
+    for(a=0;a<cs.length&&!trouve;a++)
+      for(bI=a+1;bI<cs.length&&!trouve;bI++){
+        if((memeCase(cs[a],action.c1)&&memeCase(cs[bI],action.c2))||
+           (memeCase(cs[a],action.c2)&&memeCase(cs[bI],action.c1)))trouve=true;
+      }
+    if(!trouve)ok=false;
+    else{
+      p.mode="fantome";
+      p.cells=[{q:action.c1.q,r:action.c1.r},{q:action.c2.q,r:action.c2.r}];
+      p.cell=null;
+      feuille(pieces,1,null);
+    }
+  }else if(ok&&action.t==="red"&&p.mode==="fantome"){
+    var ks2=FORCE?[tiragesF[tiragesUses.length]]:[0,1],ki2,k2;
+    for(ki2=0;ki2<ks2.length;ki2++){
+      k2=ks2[ki2];
+      if(FORCE)tiragesUses.push(k2);
+      var b3=FORCE?pieces:clonerPieces(pieces);
+      var gb3=parIdS(action.id,b3);
+      var surv3=gb3.cells[k2];
+      gb3.mode="solide";gb3.cell={q:surv3.q,r:surv3.r};gb3.cells=null;
+      feuille(b3,1/(ks2.length),null);
+    }
+  }else ok=false;
+  if(!ok)return {ok:false};
+  return FORCE?{ok:true,tirages:tiragesUses,feuille:feuilles[0]}:{ok:true,feuilles:feuilles};
+}
+
+/* ---------------- IA (Corail) : évaluation gloutonne en espérance ----------------
+   L'IA ne voit QUE le plateau public : elle évalue chaque coup par la moyenne pondérée
+   des issues (tirages 50/50), sans jamais consulter une position réelle — qui n'existe
+   d'ailleurs dans le moteur qu'au moment du tirage. */
+function distHex(a,b){var dq=a.q-b.q,dr=a.r-b.r;return (Math.abs(dq)+Math.abs(dr)+Math.abs(dq+dr))/2;}
+function alignes(a,b){
+  for(var i=0;i<6;i++)
+    for(var k=1;k<=2;k++)
+      if(a.q+DIRS[i][0]*k===b.q&&a.r+DIRS[i][1]*k===b.r)return true;
+  return false;
+}
+function actionsLegales(ps,j){
+  var res=[];
+  ps.forEach(function(p){
+    if(p.joueur!==j)return;
+    if(p.mode==="fantome"){res.push({t:"red",id:p.id});return;}
+    deplacements(p,ps).forEach(function(mv){
+      res.push({t:"dep",id:p.id,dq:mv.dq,dr:mv.dr,dist:mv.dist});
+    });
+    if(p.type==="onde"){
+      var cs=casesScission(p,ps),a,b;
+      for(a=0;a<cs.length;a++)
+        for(b=a+1;b<cs.length;b++)
+          res.push({t:"sci",id:p.id,c1:{q:cs[a].q,r:cs[a].r},c2:{q:cs[b].q,r:cs[b].r}});
+    }
+  });
+  return res;
+}
+function degatsPotentiels(ps,attaquant){             /* max par pièce cible, espérance 0,5 sur fantômes */
+  var cible=adversaire(attaquant),occ=occupation(ps),maxPar=new Map(),t=0;
+  ps.forEach(function(p){
+    if(p.joueur!==attaquant||p.mode!=="solide")return;
+    deplacements(p,ps).forEach(function(mv){
+      var o=occ.get(cle(mv));
+      if(!o||o.joueur!==cible)return;
+      var v=o.type==="noyau"?60:(o.mode==="solide"?3.4:1.7);
+      var prev=maxPar.get(o.id);
+      if(prev===undefined||v>prev)maxPar.set(o.id,v);
+    });
+  });
+  maxPar.forEach(function(v){t+=v;});
+  return t;
+}
+function evaluePosition(ps,tour,pour){
+  var G=100000,adv=adversaire(pour);
+  var noyauP=null,noyauA=null,ondesP=0,ondesA=0;
+  ps.forEach(function(p){
+    if(p.type==="noyau"){if(p.joueur===pour)noyauP=p;else noyauA=p;}
+    else{if(p.joueur===pour)ondesP++;else ondesA++;}
+  });
+  if(!noyauP)return -G;
+  if(!noyauA)return G;
+  var s=(ondesP-ondesA)*3.4;                          /* matériel (espérance) */
+  var dAdv=degatsPotentiels(ps,adv),dPour=degatsPotentiels(ps,pour);
+  if(tour===pour)s+=0.9*dPour-0.55*dAdv;              /* qui menace, et qui joue ensuite */
+  else s+=0.55*dPour-0.95*dAdv;
+  var danger=0;                                       /* sécurité du Noyau : proximité + alignements */
+  ps.forEach(function(e){
+    if(e.joueur===pour||e.type!=="onde")return;
+    var pos=e.mode==="solide"?[e.cell]:e.cells;
+    pos.forEach(function(c){
+      var d=distHex(noyauP.cell,c);
+      if(d<=2)danger+=(e.mode==="solide"?1:0.5)*(3-d);
+      if(e.mode==="solide"&&d<=2&&alignes(e.cell,noyauP.cell))danger+=0.8;
+    });
+  });
+  s-=0.8*danger;
+  s+=Math.min(4,distHex(noyauP.cell,noyauA.cell))*0.3;  /* distance entre Noyaux */
+  var mob=0;                                          /* mobilité */
+  ps.forEach(function(p){
+    if(p.mode!=="solide")return;
+    mob+=(p.joueur===pour?1:-1)*deplacements(p,ps).length;
+  });
+  s+=0.07*mob;
+  ps.forEach(function(p){                             /* pression fantôme autour du Noyau adverse */
+    if(p.joueur!==pour||p.mode!=="fantome")return;
+    p.cells.forEach(function(c){if(distHex(c,noyauA.cell)<=1)s+=0.5;});
+  });
+  return s;
+}
+function choisirActionIA(){
+  var acts=actionsLegales(state.pieces,"corail");
+  if(!acts.length)return null;
+  if(IA.niveau==="facile"&&Math.random()<0.6){        /* ~60 % : coup aléatoire légal */
+    var parPiece=[];
+    acts.forEach(function(a){
+      var e=null,i;
+      for(i=0;i<parPiece.length;i++)if(parPiece[i].id===a.id)e=parPiece[i];
+      if(!e){e={id:a.id,acts:[]};parPiece.push(e);}
+      e.acts.push(a);
+    });
+    var choix=parPiece[Math.floor(Math.random()*parPiece.length)];
+    return choix.acts[Math.floor(Math.random()*choix.acts.length)];
+  }
+  var meilleur=null,meilleurScore=-Infinity;
+  acts.forEach(function(a){
+    var sim=simulerAction(state.pieces,"corail",a,null);
+    if(!sim.ok)return;
+    var sc=0;
+    sim.feuilles.forEach(function(f){
+      if(f.over)sc+=f.p*(f.over.vainqueur==="corail"?90000:f.over.vainqueur===null?0:-90000);
+      else sc+=f.p*evaluePosition(f.pieces,f.turn,"corail");
+    });
+    sc+=Math.random()*0.06;                           /* départage léger */
+    if(sc>meilleurScore){meilleurScore=sc;meilleur=a;}
+  });
+  return meilleur;
+}
+function lanceIA(){
+  var g=GEN;
+  syncPanneau();
+  setTimeout(function(){                              /* « L'IA réfléchit… » ~800 ms */
+    if(g!==GEN||MODE!=="ia"||!state||state.over||state.turn!=="corail"||busy)return;
+    var a=choisirActionIA();
+    if(a)jouerAction(a,"ia");else syncPanneau();
+  },800+Math.floor(Math.random()*250));
+}
+
+/* ---------------- Couche modes : action unique, gating, fin de tour ---------------- */
+function tourHumainLocal(){
+  if(MODE==="accueil"||!state||state.over||busy)return false;
+  if(MODE==="hotseat")return true;
+  if(MODE==="ia")return state.turn==="azur";
+  if(MODE==="ligne")return !!enLigne&&enLigne.rolesFixes&&state.turn===enLigne.moi&&!enLigne.attente;
+  return false;
+}
+function appliquerActionAnime(action){                /* objet action → opérations animées */
+  var p=parId(action.id);
+  if(!p)return;
+  if(action.t==="dep"){
+    var mv={q:p.cell.q+action.dq*action.dist,r:p.cell.r+action.dr*action.dist,
+            dist:action.dist,dq:action.dq,dr:action.dr};
+    actionDeplacer(p,mv);
+  }else if(action.t==="sci"){
+    actionScinder(p,{q:action.c1.q,r:action.c1.r},{q:action.c2.q,r:action.c2.r});
+  }else if(action.t==="red")actionReduire(p);
+}
+function jouerAction(action,source){                  /* source : "local" | "ia" */
+  if(busy||!state||state.over)return false;
+  if(source==="local"&&!tourHumainLocal())return false;
+  if(source==="ia"&&!(MODE==="ia"&&state.turn==="corail"))return false;
+  if(MODE==="ligne"&&enLigne&&enLigne.rolesFixes){
+    if(enLigne.moi==="corail"){                       /* Corail propose : l'hôte arbitre */
+      if(!simulerAction(state.pieces,state.turn,action,null).ok){toast(T("toastIllegal"));return false;}
+      var cle=identLob7();
+      enLigne.attente=true;enLigne.cleAttente=cle;
+      armerGardeCorail();
+      envoyerLob7({type:"action",action:action,cle:cle});
+      syncPanneau();
+      return true;
+    }
+    if(!simulerAction(state.pieces,state.turn,action,null).ok){toast(T("toastIllegal"));return false;}
+    enLigne.actionEnCours={action:action};            /* Azur joue localement, puis diffuse */
+    TIRAGE_LOG=[];TIRAGES_ATTM=null;
+    appliquerActionAnime(action);
+    return true;
+  }
+  appliquerActionAnime(action);
+  return true;
+}
+
+/* ---------------- Vue : sprites, effets, tweens ---------------- */
+var vue={sprites:{},fx:[]};
+var tweens=[];
+
+function spriteDe(p){
+  var sp=vue.sprites[p.id];
+  if(!sp){
+    if(p.mode==="solide")
+      sp={kind:"solid",q:p.cell.q,r:p.cell.r,alpha:1,scale:1,rot:0,flash:0};
+    else
+      sp={kind:"ghost",cells:p.cells.map(function(c){return {q:c.q,r:c.r,alpha:1,dy:0,scale:1};}),blink:0,solid:null};
+    vue.sprites[p.id]=sp;
+  }
+  return sp;
+}
+function tween(duree,maj){
+  return new Promise(function(res){tweens.push({t0:performance.now(),duree:duree,maj:maj,res:res});});
+}
+function ajouteAnneau(c,couleur,duree){vue.fx.push({kind:"anneau",q:c.q,r:c.r,age:0,vie:(duree||650)/1000,couleur:couleur});}
+function ajouteEtincelles(c,couleur,n){
+  for(var i=0;i<(n||14);i++)
+    vue.fx.push({kind:"etincelle",q:c.q,r:c.r,age:0,vie:.45+Math.random()*.45,couleur:couleur,
+      vq:(Math.random()-.5)*2.6,vr:-(.2+Math.random()*1.6),taille:1.4+Math.random()*2.2});
+}
+function ajouteFlash(c){vue.fx.push({kind:"flash",q:c.q,r:c.r,age:0,vie:.38});}
+
+/* ---------------- Canvas et géométrie ---------------- */
+var canvas=document.getElementById("plateau");
+var ctx=canvas.getContext("2d");
+var W=0,H=0,S=40,origine={x:0,y:0};
+var etoiles=[];
+(function(){
+  for(var i=0;i<120;i++)
+    etoiles.push({x:Math.random(),y:Math.random(),s:.6+Math.random()*1.5,
+      ph:Math.random()*6.28,sp:.25+Math.random()*.75,
+      vx:(Math.random()-.5)*.006,
+      c:Math.random()<.55?"88,247,255":"255,95,210"});
+})();
+function axVersPx(q,r){return {x:origine.x+SQRT3*S*(q+r/2),y:origine.y+1.5*S*r};}
+function pxVersAx(x,y){
+  var xr=x-origine.x, yr=y-origine.y;      /* repère relatif à l'origine du plateau */
+  var r=yr/(1.5*S),q=xr/(SQRT3*S)-r/2;
+  var xq=q,zq=r,yq=-q-r;
+  var rx=Math.round(xq),ry=Math.round(yq),rz=Math.round(zq);
+  var dx=Math.abs(rx-xq),dy=Math.abs(ry-yq),dz=Math.abs(rz-zq);
+  if(dx>dy&&dx>dz)rx=-ry-rz;else if(dy>dz)ry=-rx-rz;else rz=-rx-ry;
+  return {q:rx,r:rz};
+}
+function disposition(){
+  W=innerWidth;H=innerHeight;
+  var dpr=Math.min(2.75,window.devicePixelRatio||1);
+  canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);
+  canvas.style.width=W+"px";canvas.style.height=H+"px";
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  var hdr=document.getElementById("entete").getBoundingClientRect();
+  var pan=document.getElementById("panneau").getBoundingClientRect();
+  var ax=0,ay=hdr.bottom+6,aw=W,ah=H-ay;
+  if(pan.left>W*.55){aw=pan.left-8;}        /* panneau latéral droit */
+  else{ah=Math.max(80,pan.top-ay-6);}       /* panneau en bas (écran étroit) */
+  var marge=16;
+  S=Math.max(13,Math.min((aw-2*marge)/12.9,(ah-2*marge)/11.6));
+  origine={x:ax+aw/2,y:ay+Math.max(ah/2,S*2.2)};
+}
+function cheminHexa(c2,x,y,s){
+  c2.beginPath();
+  for(var i=0;i<6;i++){
+    var a=Math.PI/180*(60*i-30);
+    var px=x+s*Math.cos(a),py=y+s*Math.sin(a);
+    if(i)c2.lineTo(px,py);else c2.moveTo(px,py);
+  }
+  c2.closePath();
+}
+
+/* ---------------- Dessin procédural des pièces ---------------- */
+function cheminBlob(c2,cx,cy,R,t,graine,ampli){
+  c2.beginPath();
+  var N=44;
+  for(var i=0;i<=N;i++){
+    var a=i/N*Math.PI*2;
+    var rr=R*(0.86+ampli*(.5+.5*Math.sin(3*a+t*1.7+graine))+ampli*.4*(.5+.5*Math.sin(5*a-t*1.15+graine*2)));
+    var x=cx+Math.cos(a)*rr,y=cy+Math.sin(a)*rr;
+    if(i)c2.lineTo(x,y);else c2.moveTo(x,y);
+  }
+  c2.closePath();
+}
+function dessineNoyau(c2,x,y,R,t,joueur,alpha,scale){
+  c2.save();c2.globalAlpha=alpha;c2.translate(x,y);c2.scale(scale,scale);
+  var c=COUL[joueur],g;
+  g=c2.createRadialGradient(-R*.35,-R*.4,R*.1,0,0,R);
+  g.addColorStop(0,shade(c,.45));g.addColorStop(.55,c);g.addColorStop(1,shade(c,-.62));
+  c2.beginPath();c2.arc(0,0,R,0,7);c2.fillStyle=g;c2.fill();
+  c2.lineWidth=1.4;c2.strokeStyle=rgbaHex(c,.5);c2.stroke();
+  var pu=.82+.18*Math.sin(t*2.4+(joueur==="azur"?0:2));
+  g=c2.createRadialGradient(0,0,0,0,0,R*.44*pu);
+  g.addColorStop(0,"rgba(255,255,255,.95)");g.addColorStop(.35,shade(c,.7));g.addColorStop(1,rgbaHex(c,0));
+  c2.beginPath();c2.arc(0,0,R*.44*pu,0,7);c2.fillStyle=g;c2.fill();
+  var oa=t*1.5+(joueur==="azur"?0:2.4);
+  c2.beginPath();c2.arc(Math.cos(oa)*R*.74,Math.sin(oa)*R*.74*.5,R*.10,0,7);
+  c2.fillStyle=shade(c,.78);c2.fill();
+  c2.restore();
+}
+function dessineOnde(c2,x,y,R,t,joueur,alpha,scale,graine){
+  c2.save();c2.globalAlpha=alpha;c2.translate(x,y);c2.scale(scale,scale);
+  var c=COUL[joueur],g;
+  cheminBlob(c2,0,0,R,t,graine,.11);
+  g=c2.createRadialGradient(-R*.3,-R*.35,R*.1,0,0,R);
+  g.addColorStop(0,shade(c,.5));g.addColorStop(.6,c);g.addColorStop(1,shade(c,-.5));
+  c2.fillStyle=g;c2.fill();
+  c2.lineWidth=1.4;c2.strokeStyle=rgbaHex(c,.55);c2.stroke();
+  c2.strokeStyle="rgba(255,255,255,.26)";c2.lineWidth=1.1;
+  for(var k=0;k<2;k++){
+    var a0=t*(k?-.85:.7)+graine;
+    c2.beginPath();c2.arc(0,0,R*(.4+.15*k),a0,a0+2.1);c2.stroke();
+  }
+  c2.restore();
+}
+function dessineFantome(c2,x,y,R,t,joueur,alpha,scale,graine){
+  if(alpha<=.01)return;
+  c2.save();c2.globalAlpha=alpha;
+  c2.translate(x,y+Math.sin(t*2+graine)*2);c2.scale(scale,scale);
+  var c=COUL[joueur];
+  cheminBlob(c2,0,0,R*.95,t,graine,.13);
+  c2.fillStyle=rgbaHex(c,.08+.04*Math.sin(t*2.2+graine));   /* scintillement holographique */
+  c2.fill();
+  c2.setLineDash([7,6]);c2.lineDashOffset=-t*14;
+  c2.lineWidth=2;c2.strokeStyle=rgbaHex(c,.9);c2.stroke();
+  c2.setLineDash([]);
+  c2.fillStyle=rgbaHex(c,.82+.16*Math.sin(t*3+graine*2));
+  c2.font="bold "+Math.max(9,Math.round(R*1.02))+"px Georgia, serif";
+  c2.textAlign="center";c2.textBaseline="middle";
+  c2.fillText("?",0,1);
+  c2.restore();
+}
+function dessineAsset(c2,img,x,y,taille,alpha,rot,scale){
+  c2.save();c2.globalAlpha=alpha;c2.translate(x,y);
+  if(rot)c2.rotate(rot);
+  if(scale&&scale!==1)c2.scale(scale,scale);
+  c2.drawImage(img,-taille/2,-taille/2,taille,taille);
+  c2.restore();
+}
+
+/* ---------------- Rendu principal ---------------- */
+function dessine(t){
+  var dpr=window.devicePixelRatio||1,g;
+  g=ctx.createRadialGradient(W/2,H*.42,0,W/2,H*.42,Math.max(W,H)*.75);
+  g.addColorStop(0,COUL.fond2);g.addColorStop(1,COUL.fond);
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  etoiles.forEach(function(e){
+    var ex=e.x+e.vx*t;ex=((ex%1)+1)%1;          /* dérive lente, en boucle */
+    ctx.fillStyle="rgba("+e.c+","+(.05+.11*(.5+.5*Math.sin(t*e.sp+e.ph)))+")";
+    ctx.fillRect(ex*W,e.y*H,e.s,e.s);
+  });
+  g=ctx.createRadialGradient(origine.x,origine.y,0,origine.x,origine.y,S*7.2);
+  g.addColorStop(0,"rgba(88,247,255,.05)");g.addColorStop(1,"rgba(88,247,255,0)");
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(origine.x,origine.y,S*7.2,0,7);ctx.fill();
+
+  var OCC=occupation();
+
+  /* ---- cases ---- */
+  CELLS.forEach(function(c){
+    var p=axVersPx(c.q,c.r),surv=survol&&memeCase(survol,c),centre=(c.q===0&&c.r===0);
+    var imgCase=Assets.asset("common/case_hex",SQRT3*S*dpr);
+    if(imgCase){
+      dessineAsset(ctx,imgCase,p.x,p.y,SQRT3*S*1.02,1,0,1);
+      if(centre){cheminHexa(ctx,p.x,p.y,S*.94);ctx.lineWidth=1.2;ctx.strokeStyle=rgbaHex(COUL.cyan,.22);ctx.stroke();}
+      if(surv){cheminHexa(ctx,p.x,p.y,S*.94);ctx.lineWidth=1.6;ctx.strokeStyle=rgbaHex(COUL.cyan,.65);ctx.stroke();}
+    }else{
+      cheminHexa(ctx,p.x,p.y,S*.94);
+      ctx.fillStyle=surv?rgbaHex(COUL.survol,.95)
+                :centre?rgbaHex(COUL.survol,.55)
+                       :rgbaHex(COUL.grille,.88);
+      ctx.fill();
+      ctx.lineWidth=1;
+      ctx.strokeStyle=surv?rgbaHex(COUL.cyan,.55):rgbaHex(COUL.contour,centre?.95:.7);
+      ctx.stroke();
+    }
+    ctx.fillStyle="rgba(207,200,255,.35)";
+    ctx.font="9.5px 'Segoe UI',sans-serif";ctx.textAlign="center";ctx.textBaseline="alphabetic";
+    ctx.fillText(nomCase(c),p.x,p.y+S*.62);
+  });
+
+  /* ---- marqueurs de sélection ---- */
+  if(sel&&!busy&&(!state.over)){
+    var ps=parId(sel.pid);
+    if(ps){
+      if(sel.kind==="ghost"){
+        ps.cells.forEach(function(c){
+          var p=axVersPx(c.q,c.r);
+          cheminHexa(ctx,p.x,p.y,S*.86);
+          ctx.setLineDash([5,4]);ctx.lineWidth=2;
+          ctx.strokeStyle=rgbaHex(COUL.cyan,.55+.25*Math.sin(t*5));
+          ctx.stroke();ctx.setLineDash([]);
+        });
+      }else{
+        var pp=axVersPx(ps.cell.q,ps.cell.r);
+        ctx.beginPath();ctx.arc(pp.x,pp.y,S*.78,0,7);
+        ctx.setLineDash([6,4]);ctx.lineWidth=2;
+        ctx.strokeStyle=rgbaHex(COUL.cyan,.5+.25*Math.sin(t*4));
+        ctx.stroke();ctx.setLineDash([]);
+        if(sel.mode==="deplacer"){
+          sel.moves.forEach(function(mv){
+            var p=axVersPx(mv.q,mv.r);
+            var cible=OCC.get(cle(mv));
+            if(cible&&cible.joueur!==ps.joueur){
+              ctx.beginPath();ctx.arc(p.x,p.y,S*.5*(1+.05*Math.sin(t*6)),0,7);
+              ctx.lineWidth=2.4;ctx.strokeStyle=rgbaHex(COUL.magenta,.85);ctx.stroke();
+              ctx.beginPath();ctx.arc(p.x,p.y,3.2,0,7);ctx.fillStyle=rgbaHex(COUL.magenta,.9);ctx.fill();
+            }else{
+              ctx.beginPath();ctx.arc(p.x,p.y,S*.24,0,7);ctx.fillStyle=rgbaHex(COUL.cyan,.14);ctx.fill();
+              ctx.beginPath();ctx.arc(p.x,p.y,S*.13,0,7);ctx.fillStyle=rgbaHex(COUL.cyan,.85);ctx.fill();
+            }
+          });
+        }else{
+          sel.splits.forEach(function(s){
+            var p=axVersPx(s.q,s.r);
+            var choisi=-1;
+            sel.picks.forEach(function(pk,i){if(memeCase(pk,s))choisi=i;});
+            cheminHexa(ctx,p.x,p.y,S*.8);
+            if(choisi>=0){
+              ctx.fillStyle=rgbaHex(COUL.magenta,.15);ctx.fill();
+              ctx.setLineDash([5,4]);ctx.lineWidth=2.2;ctx.strokeStyle=COUL.magenta;ctx.stroke();ctx.setLineDash([]);
+              ctx.beginPath();ctx.arc(p.x,p.y,S*.3,0,7);
+              ctx.fillStyle=COUL.magenta;ctx.fill();
+              ctx.fillStyle="#120b2e";ctx.font="bold "+Math.round(S*.34)+"px Georgia,serif";
+              ctx.textAlign="center";ctx.textBaseline="middle";
+              ctx.fillText(String(choisi+1),p.x,p.y+1);
+              dessineFantome(ctx,p.x,p.y,S*.5,t,ps.joueur,.3,1,hashSeed(ps.id));
+            }else{
+              ctx.setLineDash([4,5]);ctx.lineWidth=1.4;
+              ctx.strokeStyle=rgbaHex(COUL.cyan,.32+.16*Math.sin(t*4));ctx.stroke();ctx.setLineDash([]);
+            }
+          });
+          if(sel.picks.length===2){
+            var A=axVersPx(sel.picks[0].q,sel.picks[0].r),B=axVersPx(sel.picks[1].q,sel.picks[1].r);
+            ctx.setLineDash([4,6]);ctx.lineWidth=1.4;ctx.strokeStyle=rgbaHex(COUL.magenta,.5);
+            ctx.beginPath();ctx.moveTo(A.x,A.y);ctx.lineTo(B.x,B.y);ctx.stroke();ctx.setLineDash([]);
+          }
+        }
+      }
+    }
+  }
+
+  /* ---- pièces : fantômes puis solides ---- */
+  var R=S*.62;
+  state.pieces.forEach(function(p){
+    if(p.mode!=="fantome")return;
+    var sp=spriteDe(p);
+    var A=axVersPx(sp.cells[0].q,sp.cells[0].r),B=axVersPx(sp.cells[1].q,sp.cells[1].r);
+    ctx.setLineDash([3,7]);ctx.lineWidth=1.2;
+    ctx.strokeStyle=rgbaHex(COUL[p.joueur],.22);
+    ctx.beginPath();ctx.moveTo(A.x,A.y);ctx.lineTo(B.x,B.y);ctx.stroke();ctx.setLineDash([]);
+    for(var i=0;i<2;i++){
+      var cc=sp.cells[i];
+      var p2=axVersPx(cc.q,cc.r+cc.dy);
+      var a=sp.blink>0?(.3+.7*(.5+.5*Math.sin(sp.blink*Math.PI*7+i*Math.PI))):cc.alpha;
+      cheminHexa(ctx,p2.x,p2.y,S*.94);
+      ctx.fillStyle=rgbaHex(COUL[p.joueur],.05*Math.max(0,a));ctx.fill();
+      if(sp.blink>0){
+        cheminHexa(ctx,p2.x,p2.y,S*.8);
+        ctx.lineWidth=1.6;
+        ctx.strokeStyle=rgbaHex(i===0?COUL.cyan:COUL.magenta,.25+.35*Math.abs(Math.sin(sp.blink*Math.PI*7+i*Math.PI)));
+        ctx.stroke();
+      }
+      var img=Assets.asset("onde/fantome/"+p.joueur,2.6*S*dpr);
+      if(img){
+        dessineAsset(ctx,img,p2.x,p2.y,2.3*S,.92*a,0,1);
+        ctx.setLineDash([7,6]);ctx.lineDashOffset=-t*14;
+        ctx.beginPath();ctx.arc(p2.x,p2.y,R*.95,0,7);
+        ctx.lineWidth=2;ctx.strokeStyle=rgbaHex(COUL[p.joueur],.85*Math.max(0,a));ctx.stroke();ctx.setLineDash([]);
+        ctx.fillStyle=rgbaHex(COUL[p.joueur],(.8+.2*Math.sin(t*3.4+i*1.9))*.95*Math.max(0,a));
+        ctx.font="bold "+Math.round(R*1.02)+"px Georgia,serif";
+        ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText("?",p2.x,p2.y+1);
+      }else{
+        dessineFantome(ctx,p2.x,p2.y,S*.56,t,p.joueur,a,cc.scale,hashSeed(p.id)+i*1.7);
+      }
+    }
+    if(sp.solid){
+      var p3=axVersPx(sp.solid.q,sp.solid.r);
+      dessineOnde(ctx,p3.x,p3.y,R,t,p.joueur,sp.solid.alpha,sp.solid.scale,hashSeed(p.id));
+    }
+  });
+  state.pieces.forEach(function(p){
+    if(p.mode!=="solide")return;
+    var sp=spriteDe(p);
+    if(sp.alpha<=.01)return;
+    var p2=axVersPx(sp.q,sp.r);
+    g=ctx.createRadialGradient(p2.x,p2.y,R*.2,p2.x,p2.y,R*1.35);   /* halo néon */
+    g.addColorStop(0,rgbaHex(COUL[p.joueur],.22*sp.alpha));
+    g.addColorStop(1,rgbaHex(COUL[p.joueur],0));
+    ctx.beginPath();ctx.arc(p2.x,p2.y,R*1.35,0,7);ctx.fillStyle=g;ctx.fill();
+    var img=Assets.asset("onde/"+p.type+"/"+p.joueur,2.6*S*dpr);
+    if(img)dessineAsset(ctx,img,p2.x,p2.y,2.3*S,sp.alpha,sp.rot,sp.scale);
+    else if(p.type==="noyau")dessineNoyau(ctx,p2.x,p2.y,R,t,p.joueur,sp.alpha,sp.scale);
+    else dessineOnde(ctx,p2.x,p2.y,R,t,p.joueur,sp.alpha,sp.scale,hashSeed(p.id));
+    if(sp.flash>0){
+      ctx.beginPath();ctx.arc(p2.x,p2.y,R*1.15,0,7);
+      ctx.fillStyle="rgba(255,255,255,"+(.8*sp.flash)+")";ctx.fill();
+    }
+  });
+
+  /* ---- effets transitoires ---- */
+  vue.fx.forEach(function(f){
+    var pr=clamp(f.age/f.vie,0,1),p=axVersPx(f.q,f.r);
+    if(f.kind==="anneau"){
+      ctx.beginPath();ctx.arc(p.x,p.y,S*(.25+.95*easeOutCubic(pr)),0,7);
+      ctx.lineWidth=2;ctx.strokeStyle=rgbaHex(f.couleur,(1-pr)*.7);ctx.stroke();
+    }else if(f.kind==="etincelle"){
+      ctx.beginPath();ctx.arc(p.x,p.y,f.taille*(1-pr*.5),0,7);
+      ctx.fillStyle=rgbaHex(f.couleur,(1-pr)*.85);ctx.fill();
+    }else if(f.kind==="flash"){
+      g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,S*1.3);
+      g.addColorStop(0,"rgba(255,255,255,"+((1-pr)*.55)+")");
+      g.addColorStop(1,"rgba(255,255,255,0)");
+      ctx.fillStyle=g;ctx.beginPath();ctx.arc(p.x,p.y,S*1.3,0,7);ctx.fill();
+    }
+  });
+}
+
+/* ---------------- Opérations animées (état + théâtre) ---------------- */
+function opGlisser(p,vers,g){
+  var sp=spriteDe(p),de={q:sp.q,r:sp.r};
+  Snd.deplacement();
+  return tween(300,function(k){
+    var e=easeInOut(k);
+    sp.q=de.q+(vers.q-de.q)*e;
+    sp.r=de.r+(vers.r-de.r)*e;
+  }).then(function(){
+    if(g!==GEN)return;
+    p.cell={q:vers.q,r:vers.r};
+    sp.q=vers.q;sp.r=vers.r;
+    journal(fmt(T("jMvt"),{camp:FR[p.joueur],piece:p.type==="noyau"?T("motNoyau"):T("motOnde"),
+              a:nomCase(de),b:nomCase(vers)}),"mvt");
+  });
+}
+function prochaineTirage(){
+  var k=(TIRAGES_ATTM&&TIRAGES_ATTM.length)?TIRAGES_ATTM.shift():tirageEquitable();
+  if(TIRAGE_LOG)TIRAGE_LOG.push(k);
+  return k;
+}
+function opReduire(gh,cause,g){
+  var k=prochaineTirage();
+  var surv=gh.cells[k],perd=gh.cells[1-k];
+  var sp=spriteDe(gh);
+  Snd.revelation();
+  return tween(1050,function(pr){sp.blink=pr;})          /* 1. clignotement théâtral */
+  .then(function(){
+    if(g!==GEN)return;
+    sp.blink=0;
+    var li=(memeCase(sp.cells[0],perd))?0:1;              /* 2. évaporation du perdant */
+    ajouteAnneau(perd,COUL.magenta);
+    ajouteEtincelles(perd,COUL.magenta,9);
+    ajouteEtincelles(perd,COUL.cyan,7);
+    ajouteFlash(perd);
+    var lc=sp.cells[li];
+    return tween(620,function(pr){
+      var e=easeOutCubic(pr);
+      lc.alpha=1-e;lc.dy=-.55*e;lc.scale=1+.6*e;
+    }).then(function(){
+      if(g!==GEN)return;
+      sp.solid={q:surv.q,r:surv.r,alpha:0,scale:.55};     /* 3. matérialisation du survivant */
+      return tween(380,function(pr){
+        sp.cells[1-li].alpha=1-pr;
+        sp.solid.alpha=pr;
+        sp.solid.scale=.55+.45*easeOutBack(pr);
+      }).then(function(){
+        if(g!==GEN)return;
+        gh.mode="solide";gh.cell={q:surv.q,r:surv.r};gh.cells=null;
+        vue.sprites[gh.id]={kind:"solid",q:surv.q,r:surv.r,alpha:1,scale:1,rot:0,flash:0};
+        ajouteAnneau(surv,COUL.cyan);
+        toast(fmt(T("toastReduire"),{cell:nomCase(surv)}));
+        journal(fmt(T(cause==="volontaire"?"jRedVol":"jRedInt"),
+                {camp:FR[gh.joueur],cell:nomCase(surv)}),"evt");
+      });
+    });
+  });
+}
+function opCapturer(att,vic,g){
+  var sp=spriteDe(vic);
+  var cell={q:vic.cell.q,r:vic.cell.r};
+  Snd.capture();
+  ajouteFlash(cell);ajouteEtincelles(cell,COUL[vic.joueur],20);ajouteAnneau(cell,COUL.cyan,800);
+  return tween(560,function(pr){
+    sp.flash=pr<.22?pr/.22:0;
+    sp.alpha=1-easeOutCubic(pr);
+    sp.scale=1+pr*.55;
+    sp.rot=pr*.9;
+  }).then(function(){
+    if(g!==GEN)return;
+    state.pieces=state.pieces.filter(function(x){return x!==vic;});
+    delete vue.sprites[vic.id];
+    if(vic.type==="noyau"){
+      state.over=mkOverCore(att.joueur,vic.joueur,null);
+      journal(fmt(T("rNoyauCell"),{camp:FR[vic.joueur],adv:FR[att.joueur],cell:nomCase(cell)}),"evt");
+    }else{
+      journal(fmt(T("jPriseOnde"),{camp:FR[vic.joueur],cell:nomCase(cell),adv:FR[att.joueur]}),"evt");
+    }
+    toast(vic.type==="noyau"?T("toastNoyauTombe"):T("toastCapture"));
+  });
+}
+
+/* ---------------- Actions complètes ---------------- */
+function actionDeplacer(p,mv){
+  if(busy)return;
+  busy=true;annulerSelection(false);
+  var g=GEN;
+  var depart={q:p.cell.q,r:p.cell.r};
+  (function boucle(s){
+    if(s>mv.dist)return finDeTour(g);
+    /* la case de l'étape s se calcule toujours depuis l'ORIGINE du mouvement :
+       selon les réductions rencontrées, la pièce a pu s'arrêter en chemin ou non. */
+    var next={q:depart.q+s*mv.dq,r:depart.r+s*mv.dr};
+    var gh=fantomeSur(next);
+    var suite=function(){
+      var sol=solideSur(next);              /* occupant AVANT le glissement */
+      return opGlisser(p,next,g).then(function(){
+        if(g!==GEN)return;
+        if(sol&&sol.joueur!==p.joueur)return opCapturer(p,sol,g).then(function(){finDeTour(g);});
+        boucle(s+1);
+      });
+    };
+    if(gh){                                  /* interaction = réduction d'abord */
+      return opReduire(gh,"interaction",g).then(function(){
+        if(g!==GEN)return;
+        var surv=gh.mode==="solide"?gh.cell:null;
+        if(surv&&memeCase(surv,next)){
+          if(gh.joueur!==p.joueur){          /* survivant ennemi sur la case visée : capture */
+            return opGlisser(p,next,g).then(function(){
+              if(g!==GEN)return;
+              opCapturer(p,gh,g).then(function(){finDeTour(g);});
+            });
+          }
+          toast(T("toastFantomeChemin"));
+          journal(fmt(T("jInterrompu"),{camp:FR[p.joueur],cell:nomCase(next)}),"evt");
+          return finDeTour(g);
+        }
+        return suite();                      /* attaque passée au travers : on continue */
+      });
+    }
+    if(s<mv.dist){
+      var sol2=solideSur(next);
+      if(sol2)return finDeTour(g);           /* garde-fou (normalement pré-filtré) */
+      return boucle(s+1);
+    }
+    return suite();
+  })(1);
+}
+function actionScinder(p,c1,c2){
+  if(busy)return;
+  busy=true;annulerSelection(false);
+  var g=GEN,sp=spriteDe(p);
+  Snd.scission();
+  ajouteAnneau(p.cell,COUL.magenta);
+  ajouteEtincelles(p.cell,COUL.cyan,7);
+  tween(380,function(pr){sp.alpha=1-pr;sp.scale=1+pr*.5;}).then(function(){
+    if(g!==GEN)return;
+    p.mode="fantome";p.cells=[{q:c1.q,r:c1.r},{q:c2.q,r:c2.r}];p.cell=null;
+    delete vue.sprites[p.id];                /* le sprite solide laisse place au fantôme */
+    var gs=spriteDe(p);
+    gs.cells[0].alpha=0;gs.cells[1].alpha=0;
+    tween(520,function(pr){
+      gs.cells[0].alpha=clamp(pr*1.6,0,1);
+      gs.cells[1].alpha=clamp((pr-.35)*1.6,0,1);
+    }).then(function(){
+      if(g!==GEN)return;
+      toast(T("toastScission"));
+      journal(fmt(T("jScission"),{camp:FR[p.joueur],a:nomCase(c1),b:nomCase(c2)}),"evt");
+      finDeTour(g);
+    });
+  });
+}
+function actionReduire(gh){
+  if(busy)return;
+  busy=true;annulerSelection(false);
+  var g=GEN;
+  opReduire(gh,"volontaire",g).then(function(){
+    if(g!==GEN)return;
+    finDeTour(g);
+  });
+}
+function finDeTour(g){
+  if(g!==GEN)return;
+  if(state.over){busy=false;afficheVictoire();apresTour();return;}
+  var suivant=adversaire(state.turn);
+  if(peutAgir(suivant)){
+    state.turn=suivant;
+  }else{
+    toast(fmt(T("toastPasse"),{camp:FR[suivant]}));
+    journal(fmt(T("jPasse"),{camp:FR[suivant]}),"evt");
+    if(!peutAgir(state.turn)){
+      state.over=mkOverBloque();
+      busy=false;afficheVictoire();apresTour();return;
+    }
+  }
+  busy=false;syncPanneau();apresTour();
+}
+/* Appelée après CHAQUE action terminée (état final, busy retombé) : déclenche l'IA
+   ou la synchronisation du salon LOB7 selon le mode. */
+function apresTour(){
+  TIRAGES_ATTM=null;                                  /* un tirage forcé ne survit pas à l'action */
+  if(MODE==="ia"&&!state.over&&state.turn==="corail"){lanceIA();return;}
+  if(MODE==="ligne"&&enLigne&&enLigne.rolesFixes){
+    if(enLigne.moi==="azur"){                         /* l'arbitre diffuse la vue publique */
+      envoieVue();
+      if(state.over)envoyerLob7({type:"fin",vainqueur:state.over.vainqueur||null});
+      enLigne.actionEnCours=null;TIRAGE_LOG=null;
+      traiterFileLob7();
+    }else{
+      reconcilierCorail();
+      enLigne.attente=false;
+      syncPanneau();
+    }
+  }
+}
+
+/* ---------------- Sélection et entrées ---------------- */
+function annulerSelection(maj){
+  sel=null;
+  if(maj!==false)syncPanneau();
+}
+function selectionner(p){
+  if(p.mode==="fantome"){
+    sel={pid:p.id,kind:"ghost"};
+  }else{
+    var mvs=deplacements(p);
+    var sps=p.type==="onde"?casesScission(p):[];
+    if(!mvs.length&&!sps.length){
+      toast(T("toastImmobile"));
+      sel=null;syncPanneau();return;
+    }
+    sel={pid:p.id,kind:"solid",mode:mvs.length?"deplacer":"scinder",moves:mvs,splits:sps,picks:[]};
+  }
+  syncPanneau();
+}
+function caseDuClic(e){
+  var rect=canvas.getBoundingClientRect();
+  var x=e.clientX-rect.left,y=e.clientY-rect.top;
+  var c=pxVersAx(x,y);
+  if(dansPlateau(c))return c;
+  return null;
+}
+canvas.addEventListener("click",function(e){
+  if(busy||state.over||!tourHumainLocal())return;
+  var c=caseDuClic(e);
+  if(!c){annulerSelection();return;}
+  var p=pieceSur(c);
+  if(sel&&sel.kind==="solid"&&sel.mode==="scinder"){
+    if(p&&p.id===sel.pid){annulerSelection();return;}
+      if(p){toast(T("toastCasesVides"));return;}
+    var ok=sel.splits.some(function(s){return memeCase(s,c);});
+    if(ok){
+      var i=sel.picks.findIndex(function(x){return memeCase(x,c);});
+      if(i>=0)sel.picks.splice(i,1);
+      else if(sel.picks.length<2)sel.picks.push({q:c.q,r:c.r});
+      syncPanneau();return;
+    }
+    return;
+  }
+  if(sel&&sel.kind==="solid"&&sel.mode==="deplacer"){
+    var mv=sel.moves.find(function(m){return m.q===c.q&&m.r===c.r;});
+    if(mv){jouerAction({t:"dep",id:sel.pid,dq:mv.dq,dr:mv.dr,dist:mv.dist},"local");return;}
+  }
+  if(p){
+    if(p.joueur===state.turn){
+      if(sel&&sel.pid===p.id)annulerSelection();
+      else selectionner(p);
+    }else annulerSelection();
+    return;
+  }
+  annulerSelection();
+});
+canvas.addEventListener("mousemove",function(e){
+  survol=caseDuClic(e);
+  var cur="default";
+  if(!busy&&!state.over&&tourHumainLocal()&&survol){
+    var p=pieceSur(survol);
+    if(p&&p.joueur===state.turn)cur="pointer";
+    else if(sel&&sel.kind==="solid"){
+      if(sel.mode==="deplacer"&&sel.moves.some(function(m){return memeCase(m,survol);}))cur="pointer";
+      if(sel.mode==="scinder"&&sel.splits.some(function(s){return memeCase(s,survol);}))cur="pointer";
+    }
+  }
+  canvas.style.cursor=cur;
+});
+canvas.addEventListener("mouseleave",function(){survol=null;});
+window.addEventListener("keydown",function(e){
+  if(e.key==="Escape"){annulerSelection();}
+  if(e.key==="Enter"){
+    var b=document.getElementById("btn-confirmer-split");
+    if(b&&!b.classList.contains("cache")&&!b.disabled)b.click();
+  }
+});
+
+/* ---------------- Interface : panneau, toasts, journal ---------------- */
+var dom={
+  pastille:document.getElementById("pastille-tour"),
+  nom:document.getElementById("nom-tour"),
+  detail:document.getElementById("detail-tour"),
+  carteTour:document.getElementById("carte-tour"),
+  indice:document.getElementById("indice"),
+  modes:document.getElementById("modes"),
+  bDep:document.getElementById("btn-mode-deplacer"),
+  bSci:document.getElementById("btn-mode-scinder"),
+  cpt:document.getElementById("compteur-split"),
+  bConf:document.getElementById("btn-confirmer-split"),
+  bRed:document.getElementById("btn-reduire"),
+  journal:document.getElementById("journal"),
+  toasts:document.getElementById("toasts")
+};
+function compter(j){
+  var n={solides:0,fantomes:0};
+  state.pieces.forEach(function(p){
+    if(p.joueur!==j||p.type!=="onde")return;
+    if(p.mode==="solide")n.solides++;else n.fantomes++;
+  });
+  return n;
+}
+function syncPanneau(){
+  var c=COUL[state.turn];
+  dom.carteTour.style.setProperty("--c",c);
+  dom.pastille.style.background=c;
+  dom.pastille.style.boxShadow="0 0 14px "+c;
+  dom.nom.textContent=FR[state.turn];
+  dom.nom.style.color=c;
+  var ct=compter(state.turn);
+  var suffixe="";
+  if(MODE==="ia"&&state.turn==="corail")suffixe=T("sufIA");
+  if(MODE==="ligne"&&enLigne&&enLigne.rolesFixes&&state.turn===enLigne.moi)suffixe=T("sufVous");
+  var mat=T("matCore")+", "+fmt(ct.solides===1?T("matOnde1"):T("matOndeN"),{n:ct.solides});
+  if(ct.fantomes)mat+=", "+fmt(ct.fantomes===1?T("matFantome1"):T("matFantomeN"),{n:ct.fantomes});
+  dom.detail.textContent=T("auTour")+suffixe+" — "+mat;
+  var p=sel?parId(sel.pid):null;
+  dom.modes.classList.toggle("cache",!(sel&&sel.kind==="solid"&&p&&p.type==="onde"));
+  dom.bRed.classList.toggle("cache",!(sel&&sel.kind==="ghost"));
+  dom.cpt.classList.add("cache");
+  dom.bConf.classList.add("cache");
+  dom.bConf.disabled=true;
+  if(state.over){
+    dom.indice.textContent=T("finPartie");
+  }else if(MODE==="ia"&&state.turn==="corail"){
+    dom.indice.innerHTML=T("iaPense");
+  }else if(MODE==="ligne"&&enLigne&&enLigne.rolesFixes){
+    if(enLigne.moi==="corail"&&enLigne.attente)
+      dom.indice.textContent=T("coupTransmis");
+    else if(state.turn!==enLigne.moi)
+      dom.indice.textContent=fmt(T("auTourDe"),{camp:FR[adversaire(enLigne.moi)]});
+    else
+      dom.indice.textContent=T("indiceSel");
+  }else if(!sel){
+    dom.indice.textContent=fmt(T("indiceSelCamp"),{camp:FR[state.turn]});
+  }else if(sel.kind==="ghost"){
+    dom.indice.innerHTML=fmt(T("indiceFantome"),
+      {cells:p.cells.map(nomCase).join(" "+T("et")+" ")});
+  }else if(sel.mode==="deplacer"){
+    dom.indice.innerHTML=p.type==="noyau"
+      ?T("indiceNoyau")
+      :(sel.moves.length===1?T("depl1"):fmt(T("deplN"),{n:sel.moves.length}));
+    dom.bDep.classList.add("actif");dom.bSci.classList.remove("actif");
+  }else{
+    dom.indice.innerHTML=T("indiceSci");
+    dom.bSci.classList.add("actif");dom.bDep.classList.remove("actif");
+    dom.cpt.classList.remove("cache");
+    var nb=sel.picks.length;
+    dom.cpt.textContent=fmt(nb===1?T("cpt1"):T("cptN"),{n:nb})+
+      (nb===2?" ("+sel.picks.map(nomCase).join(" ↔ ")+")":"");
+    if(nb===2){
+      dom.bConf.classList.remove("cache");
+      dom.bConf.disabled=false;
+    }
+  }
+}
+function toast(msg){
+  var d=document.createElement("div");
+  d.className="toast";d.textContent=msg;
+  dom.toasts.appendChild(d);
+  while(dom.toasts.children.length>4)dom.toasts.firstChild.remove();
+  setTimeout(function(){
+    d.classList.add("sortie");
+    setTimeout(function(){if(d.parentNode)d.remove();},420);
+  },3400);
+}
+function journal(msg,cls){
+  var li=document.createElement("li");
+  li.textContent=msg;
+  if(cls)li.className=cls;
+  dom.journal.insertBefore(li,dom.journal.firstChild);
+  while(dom.journal.children.length>40)dom.journal.lastChild.remove();
+}
+
+/* ---------------- Victoire, règles, nouvelle partie ---------------- */
+function afficheVictoire(){
+  var o=state.over;
+  var titre=document.getElementById("titre-victoire");
+  var texte=document.getElementById("texte-victoire");
+  if(o.vainqueur){
+    titre.textContent=T("victoireTitre");
+    titre.style.color=COUL[o.vainqueur];
+    titre.style.textShadow="0 0 26px "+COUL[o.vainqueur];
+    texte.textContent=fmt(T("victoireTexte"),{camp:FR[o.vainqueur]})+" "+texteRaison(o);
+    Snd.victoire();
+    for(var i=0;i<5;i++)(function(i){
+      setTimeout(function(){
+        var c=CELLS[Math.floor(Math.random()*CELLS.length)];
+        ajouteEtincelles(c,COUL[o.vainqueur],16);
+      },i*260);
+    })(i);
+  }else{
+    titre.textContent=T("patTitre");
+    titre.style.color=COUL.texte;
+    titre.style.textShadow="0 0 26px rgba(207,200,255,.5)";
+    texte.textContent=texteRaison(o);
+  }
+  document.getElementById("modale-victoire").classList.remove("cache");
+  document.getElementById("btn-rejouer").classList.toggle("cache",MODE==="ligne");
+  document.getElementById("btn-quitter-fin").classList.toggle("cache",MODE!=="ligne");
+  syncPanneau();
+}
+function nouvellePartie(){
+  GEN++;
+  tweens.length=0;vue.fx.length=0;vue.sprites={};
+  busy=false;sel=null;survol=null;
+  TIRAGES_ATTM=null;TIRAGE_LOG=null;
+  state={pieces:piecesInitiales(),turn:"azur",over:null};
+  document.getElementById("modale-victoire").classList.add("cache");
+  journal(T("sepNouvelle"),"sep");
+  if(MODE!=="accueil")toast(T("toastNouvelle"));
+  syncPanneau();
+}
+document.getElementById("btn-nouvelle").addEventListener("click",nouvellePartie);
+document.getElementById("btn-rejouer").addEventListener("click",nouvellePartie);
+document.getElementById("btn-regles").addEventListener("click",function(){
+  document.getElementById("modale-regles").classList.remove("cache");
+});
+document.getElementById("btn-fermer-regles").addEventListener("click",function(){
+  document.getElementById("modale-regles").classList.add("cache");
+});
+document.getElementById("modale-regles").addEventListener("click",function(e){
+  if(e.target===this)this.classList.add("cache");
+});
+document.getElementById("btn-son").addEventListener("click",function(){
+  sonActif=Snd.bascule();
+  this.textContent=sonActif?T("sonOui"):T("sonNon");
+});
+dom.bDep.addEventListener("click",function(){
+  if(sel&&sel.kind==="solid"){sel.mode="deplacer";sel.picks=[];syncPanneau();}
+});
+dom.bSci.addEventListener("click",function(){
+  if(sel&&sel.kind==="solid"&&parId(sel.pid).type==="onde"){sel.mode="scinder";sel.picks=[];syncPanneau();}
+});
+dom.bConf.addEventListener("click",function(){
+  if(sel&&sel.kind==="solid"&&sel.mode==="scinder"&&sel.picks.length===2&&!busy){
+    var p=parId(sel.pid);
+    if(p)jouerAction({t:"sci",id:p.id,
+                      c1:{q:sel.picks[0].q,r:sel.picks[0].r},
+                      c2:{q:sel.picks[1].q,r:sel.picks[1].r}},"local");
+  }
+});
+dom.bRed.addEventListener("click",function(){
+  if(sel&&sel.kind==="ghost"&&!busy){
+    var p=parId(sel.pid);
+    if(p&&p.mode==="fantome")jouerAction({t:"red",id:p.id},"local");
+  }
+});
+
+/* ---------------- Salon LOB7 : mode en ligne ----------------
+   Autorité : Azur (plus petit clientId) détient l'état réel et tire les réductions ;
+   Corail propose {type:"action"} et reçoit {type:"vue"} = plateau PUBLIC uniquement
+   (solides, paires de cases « ? », tour, fin) + l'action et les tirages déjà publics
+   pour rejouer les animations. Jamais une position réelle ne circule : dans le moteur,
+   elle n'existe qu'au moment du tirage. */
+var CODES_FATAUX=["ROOM_CONNECTION_CLOSED","ROOM_EXPIRED","ROOM_NOT_FOUND","RELEASE_NOT_FOUND",
+  "ACCOUNT_SUSPENDED","GAME_NOT_ALLOWED","SCOPE_REQUIRED","AUTH_INVALID","AUTH_REQUIRED",
+  "ROOM_PREVIEW_REQUIRED","ROOM_BRIDGE_UNAVAILABLE","ROOM_PROTOCOL_INVALID"];
+function identLob7(){
+  var b=new Uint8Array(8),i;
+  if(window.crypto&&crypto.getRandomValues)crypto.getRandomValues(b);
+  else for(i=0;i<8;i++)b[i]=Math.floor(Math.random()*256);
+  var s="";
+  for(i=0;i<8;i++)s+=(b[i]<16?"0":"")+b[i].toString(16);
+  return s;
+}
+function estFatalLob7(e){return CODES_FATAUX.indexOf(e&&e.code)>=0;}
+function snapshotPublic(){
+  return {pieces:state.pieces.map(function(p){
+      return {id:p.id,joueur:p.joueur,type:p.type,mode:p.mode,
+              cell:p.cell?{q:p.cell.q,r:p.cell.r}:null,
+              cells:p.cells?p.cells.map(function(c){return {q:c.q,r:c.r};}):null};
+    }),turn:state.turn,over:state.over};
+}
+function poserEtat(etat){                           /* resynchronisation brute sur une vue */
+  GEN++;tweens.length=0;vue.fx.length=0;vue.sprites={};
+  busy=false;sel=null;survol=null;TIRAGES_ATTM=null;TIRAGE_LOG=null;
+  state={pieces:clonerPieces(etat.pieces),turn:etat.turn,over:etat.over||null};
+  document.getElementById("modale-victoire").classList.add("cache");
+  syncPanneau();
+}
+function envoyerLob7(m,tente){
+  if(!enLigne||!enLigne.actif)return;
+  m.clientId=enLigne.clientId;
+  var opts=null;
+  if(m.type==="vue")opts={idempotencyKey:enLigne.clientId+"-vue-"+m.payload.seq};
+  else if(m.type==="action")opts={idempotencyKey:m.cle};
+  var pr=opts?enLigne.conn.send(m,opts):enLigne.conn.send(m);
+  pr.catch(function(e){
+    if(estFatalLob7(e))return salonPerdu(e);
+    if(!tente&&opts)setTimeout(function(){envoyerLob7(m,true);},1500); /* réessai, même clé */
+  });
+}
+function envoieVue(){
+  if(!enLigne||enLigne.moi!=="azur")return;
+  var payload={seq:enLigne.seqVue+1,
+               action:enLigne.actionEnCours?enLigne.actionEnCours.action:null,
+               tirages:TIRAGE_LOG||[],
+               etat:snapshotPublic()};
+  enLigne.seqVue=payload.seq;
+  envoyerLob7({type:"vue",pour:"corail",payload:payload});
+}
+function boucleLectureLob7(){
+  if(!enLigne||!enLigne.actif)return;
+  enLigne.conn.read({after:enLigne.curseur,limit:50}).then(function(batch){
+    if(!enLigne||!enLigne.actif)return;
+    if(enLigne.S0===null)enLigne.S0=batch.cursor;    /* tout message ≤ S0 est antérieur à mon arrivée */
+    batch.messages.forEach(function(m){
+      if(m.sequence>enLigne.curseur)enLigne.curseur=m.sequence;
+      try{traiterMessageLob7(m);}catch(e){}
+    });
+    if(batch.cursor>enLigne.curseur)enLigne.curseur=batch.cursor;
+    setTimeout(boucleLectureLob7,1100);
+  }).catch(function(e){
+    if(!enLigne||!enLigne.actif)return;
+    if(estFatalLob7(e))return salonPerdu(e);
+    setTimeout(boucleLectureLob7,4000);
+  });
+}
+function pingLob7(){
+  if(!enLigne||!enLigne.actif||enLigne.rolesFixes)return;
+  envoyerLob7({type:"hello",clientId:enLigne.clientId});
+}
+function traiterMessageLob7(m){
+  var d=m&&m.data;
+  if(!d||typeof d!=="object"||!d.type)return;
+  if(d.clientId===enLigne.clientId)return;           /* mes propres échos */
+  if(enLigne.S0!==null&&m.sequence<=enLigne.S0)return;
+  if(d.type==="hello"){traiterHelloLob7(d);return;}
+  if(!enLigne.adv){enLigne.adv=d.clientId;resoudreRolesLob7();}
+  if(d.clientId!==enLigne.adv)return;               /* un tiers : salon plein pour lui */
+  if(d.type==="action"&&enLigne.moi==="azur")hoteTraiteActionLob7(d);
+  else if(d.type==="vue"&&enLigne.moi==="corail"&&d.pour==="corail")corailTraiteVueLob7(d.payload);
+  else if(d.type==="refus"&&enLigne.moi==="corail"&&enLigne.attente){
+    enLigne.attente=false;enLigne.cleAttente=null;
+    desarmerGardeCorail();
+    toast(d.motif||T("refusDefaut"));
+    syncPanneau();
+  }
+  else if(d.type==="fin"&&enLigne.moi==="corail"&&state&&!state.over&&
+          enLigne.dernierSnapshot&&enLigne.dernierSnapshot.over){
+    poserEtat(enLigne.dernierSnapshot);afficheVictoire();
+  }
+  else if(d.type==="bye")adversaireParti();
+}
+function traiterHelloLob7(d){
+  if(enLigne.adv!==null){
+    if(d.clientId===enLigne.adv&&!enLigne.rolesFixes)
+      envoyerLob7({type:"hello",clientId:enLigne.clientId});   /* réponse d'appariement */
+    return;
+  }
+  enLigne.adv=d.clientId;
+  resoudreRolesLob7();
+}
+function resoudreRolesLob7(){                        /* élection : plus petit clientId = Azur */
+  if(!enLigne||enLigne.adv===null||enLigne.moi!==null)return;
+  enLigne.moi=enLigne.clientId<enLigne.adv?"azur":"corail";
+  if(enLigne.moi==="azur"){
+    enLigne.rolesFixes=true;
+    nouvellePartie();                                /* l'arbitre prépare l'état réel */
+    journal(T("jSalonAzur"),"sep");
+    toast(T("toastAzurHote"));
+    montrerAccueil(false);basculeBoutonsMode();
+    envoieVue();                                     /* vue 0 : plateau initial public */
+  }else{
+    statutAccueil(T("statutAdvTrouve"));
+  }
+}
+function hoteTraiteActionLob7(d){                    /* l'arbitre valide, tire, applique, diffusera */
+  if(!d.action||!d.cle)return;
+  if(enLigne.cles.has(d.cle)){envoieVue();return;}   /* idempotence : renvoyer la dernière vue */
+  if(busy){enLigne.fileAttente=d;return;}
+  if(state.over||state.turn!=="corail"){
+    envoyerLob7({type:"refus",cle:d.cle,motif:T("refusTour")});
+    return;
+  }
+  var sim=simulerAction(state.pieces,state.turn,d.action,[tirageEquitable(),tirageEquitable()]);
+  if(!sim.ok){envoyerLob7({type:"refus",cle:d.cle,motif:T("refusIllegal")});return;}
+  enLigne.cles.add(d.cle);
+  enLigne.actionEnCours={action:d.action};
+  TIRAGES_ATTM=sim.tirages.slice();TIRAGE_LOG=[];
+  appliquerActionAnime(d.action);                   /* finDeTour → apresTour → envoieVue + fin */
+}
+function traiterFileLob7(){
+  if(!enLigne||enLigne.moi!=="azur"||!enLigne.fileAttente||busy)return;
+  var d=enLigne.fileAttente;enLigne.fileAttente=null;
+  hoteTraiteActionLob7(d);
+}
+function corailTraiteVueLob7(payload){
+  if(!payload||typeof payload.seq!=="number"||payload.seq<=enLigne.seqVu)return; /* idempotence */
+  enLigne.seqVu=payload.seq;
+  enLigne.dernierSnapshot=payload.etat;
+  if(!enLigne.rolesFixes){
+    enLigne.rolesFixes=true;
+    poserEtat(payload.etat);
+    journal(T("jSalonCorail"),"sep");
+    toast(T("toastCorail"));
+    montrerAccueil(false);basculeBoutonsMode();
+    return;
+  }
+  if(state.over)return;                              /* fin déjà rendue */
+  if(payload.action&&!busy){                         /* rejeu animé avec les tirages publics */
+    enLigne.attente=true;
+    TIRAGES_ATTM=(payload.tirages||[]).slice();TIRAGE_LOG=[];
+    appliquerActionAnime(payload.action);            /* finDeTour → apresTour → réconciliation */
+  }else{
+    poserEtat(payload.etat);
+    if(payload.etat.over)afficheVictoire();
+  }
+}
+function reconcilierCorail(){                        /* l'état de l'arbitre fait foi */
+  var snap=enLigne&&enLigne.dernierSnapshot;
+  if(!snap)return;
+  if(JSON.stringify(snap)!==JSON.stringify(snapshotPublic())){
+    poserEtat(snap);
+    toast(T("toastResync"));
+  }
+  enLigne.cleAttente=null;
+  desarmerGardeCorail();
+}
+function armerGardeCorail(){                         /* hôte muet : écran dédié */
+  desarmerGardeCorail();
+  enLigne.gardeAttente=setTimeout(function(){
+    if(enLigne&&enLigne.attente)
+      salonPerdu({code:"HOTE_MUET",message:T("hoteMuet")});
+  },40000);
+}
+function desarmerGardeCorail(){
+  if(enLigne&&enLigne.gardeAttente){clearTimeout(enLigne.gardeAttente);enLigne.gardeAttente=null;}
+}
+function demarrerEnLigne(){
+  statutAccueil(T("statutConnexion"));
+  domAcc.annuler.classList.remove("cache");
+  LOB7Rooms.connect().then(function(conn){
+    if(MODE!=="ligne")return;
+    enLigne={conn:conn,clientId:identLob7(),adv:null,moi:null,rolesFixes:false,
+             seqVue:-1,seqVu:-1,cles:new Set(),attente:false,cleAttente:null,
+             curseur:0,S0:null,actif:true,actionEnCours:null,dernierSnapshot:null,
+             fileAttente:null,gardeAttente:null,timers:[]};
+    enLigne.timers.push(setInterval(pingLob7,3000));
+    enLigne.timers.push(setTimeout(function(){
+      if(enLigne&&!enLigne.rolesFixes)echecLigne(T("echecPersonne"));
+    },30000));
+    pingLob7();
+    boucleLectureLob7();
+    statutAccueil(T("statutRecherche"));
+  }).catch(function(e){
+    var msg=e&&e.code==="ROOM_PREVIEW_REQUIRED"
+      ?T("horsLob7")
+      :fmt(T("echecSalon"),{msg:(e&&e.message)||T("lob7Indispo")});
+    echecLigne(msg);
+  });
+}
+function terminerLigne(envoyerBye){
+  if(!enLigne)return;
+  var e=enLigne;enLigne=null;
+  e.actif=false;
+  (e.timers||[]).forEach(function(t){clearInterval(t);clearTimeout(t);});
+  if(e.gardeAttente)clearTimeout(e.gardeAttente);
+  if(envoyerBye){try{e.conn.send({type:"bye",clientId:e.clientId});}catch(x){}}
+}
+function salonPerdu(e){
+  if(!enLigne)return;
+  terminerLigne(false);
+  ecranDeconnexion(fmt(T("decoPerdue"),{msg:(e&&e.message)||T("salonFerne")}));
+}
+function adversaireParti(){
+  if(!enLigne)return;
+  terminerLigne(false);
+  ecranDeconnexion(T("decoParti"));
+}
+function ecranDeconnexion(msg){
+  MODE="accueil";
+  montrerAccueil(false);
+  basculeBoutonsMode();
+  document.getElementById("texte-deconnexion").textContent=msg;
+  document.getElementById("modale-deconnexion").classList.remove("cache");
+  document.getElementById("modale-victoire").classList.add("cache");
+  sel=null;busy=false;syncPanneau();
+}
+function quitterSalon(){
+  terminerLigne(true);
+  document.getElementById("modale-deconnexion").classList.add("cache");
+  document.getElementById("modale-victoire").classList.add("cache");
+  allerAccueil();
+}
+
+/* ---------------- Écran d'accueil ---------------- */
+var domAcc={
+  modale:document.getElementById("modale-accueil"),
+  statut:document.getElementById("accueil-statut"),
+  annuler:document.getElementById("btn-accueil-annuler"),
+  hotseat:document.getElementById("btn-choix-hotseat"),
+  ia:document.getElementById("btn-choix-ia"),
+  facile:document.getElementById("btn-ia-facile"),
+  ligne:document.getElementById("btn-choix-ligne"),
+  secondaires:document.getElementById("accueil-secondaires")
+};
+function statutAccueil(txt){domAcc.statut.innerHTML=txt||"";}
+function montrerAccueil(v){
+  domAcc.modale.classList.toggle("cache",!v);
+  document.getElementById("btn-accueil").classList.toggle("cache",!v);
+}
+function montrerMenuAccueil(menu){
+  domAcc.ia.classList.toggle("cache",!menu);
+  domAcc.secondaires.classList.toggle("cache",!menu);
+}
+function basculeBoutonsMode(){
+  document.getElementById("btn-nouvelle").classList.toggle("cache",MODE==="ligne");
+  document.getElementById("btn-quitter-salon").classList.toggle("cache",MODE!=="ligne");
+}
+function entrerDansMode(m){
+  MODE=m;
+  montrerMenuAccueil(true);
+  statutAccueil("");
+  domAcc.annuler.classList.add("cache");
+  montrerAccueil(false);
+  basculeBoutonsMode();
+  nouvellePartie();
+}
+function allerAccueil(){
+  MODE="accueil";
+  montrerMenuAccueil(true);
+  statutAccueil("");
+  domAcc.annuler.classList.add("cache");
+  montrerAccueil(true);
+  basculeBoutonsMode();
+}
+function echecLigne(msg){
+  terminerLigne(false);
+  MODE="accueil";
+  montrerMenuAccueil(true);
+  domAcc.annuler.classList.add("cache");
+  statutAccueil(msg);
+  toast(msg);
+}
+domAcc.hotseat.addEventListener("click",function(){entrerDansMode("hotseat");});
+/* Le gros bouton central démarre directement une partie IA (Normal) :
+   la position initiale s'affiche, l'humain est Azur et commence. */
+domAcc.ia.addEventListener("click",function(){IA.niveau="normal";entrerDansMode("ia");});
+domAcc.facile.addEventListener("click",function(){IA.niveau="facile";entrerDansMode("ia");});
+domAcc.ligne.addEventListener("click",function(){
+  MODE="ligne";
+  montrerMenuAccueil(false);
+  demarrerEnLigne();
+});
+domAcc.annuler.addEventListener("click",function(){terminerLigne(false);allerAccueil();});
+document.getElementById("btn-deconnexion-accueil").addEventListener("click",allerAccueil);
+document.getElementById("btn-quitter-fin").addEventListener("click",quitterSalon);
+document.getElementById("btn-quitter-salon").addEventListener("click",quitterSalon);
+document.getElementById("btn-accueil").addEventListener("click",function(){
+  if(MODE==="ligne")quitterSalon();else allerAccueil();
+});
+
+/* ---------------- Légende animée ---------------- */
+var legCtx=[
+  document.getElementById("leg-noyau").getContext("2d"),
+  document.getElementById("leg-onde").getContext("2d"),
+  document.getElementById("leg-fantome").getContext("2d")
+];
+function dessineLegende(t){
+  legCtx.forEach(function(c2){c2.clearRect(0,0,46,46);});
+  dessineNoyau(legCtx[0],23,24,13,t,"azur",1,1);
+  dessineOnde(legCtx[1],23,24,13,t,"azur",1,1,2.1);
+  dessineFantome(legCtx[2],23,24,11.5,t,"azur",1,1,4.2);
+}
+
+/* ---------------- Boucle principale ---------------- */
+var dernierT=performance.now();
+function boucle(maint){
+  var dt=Math.min(50,maint-dernierT)/1000;
+  dernierT=maint;
+  for(var i=tweens.length-1;i>=0;i--){
+    var tw=tweens[i];
+    var p=Math.min(1,(maint-tw.t0)/tw.duree);
+    tw.maj(p);
+    if(p>=1){
+      tweens.splice(i,1);
+      tw.res();
+    }
+  }
+  for(var j=vue.fx.length-1;j>=0;j--){
+    var f=vue.fx[j];
+    f.age+=dt;
+    if(f.kind==="etincelle"){f.q+=f.vq*dt;f.r+=f.vr*dt;}
+    if(f.age>=f.vie)vue.fx.splice(j,1);
+  }
+  dessine(maint/1000);
+  dessineLegende(maint/1000);
+  requestAnimationFrame(boucle);
+}
+
+/* ---------------- Démarrage ---------------- */
+window.addEventListener("resize",disposition);
+Assets.boot();
+disposition();
+nouvellePartie();
+setLang(LANG);
+requestAnimationFrame(boucle);
+</script>
+</body>
+</html>
